@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HCPI 訂單進度系統｜弘丞精密工業</title>
+<script src="https://accounts.google.com/gsi/client"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --brand: #5B21F4;
+    --brand-dark: #4318C4;
+    --brand-light: #EDE9FD;
+    --brand-mid: #7C3AED;
+    --gray-50: #F9F9F9;
+    --gray-100: #F1F1F1;
+    --gray-200: #E2E2E2;
+    --gray-400: #A0A0A0;
+    --gray-600: #5A5A5A;
+    --gray-800: #222222;
+    --white: #FFFFFF;
+    --success: #3B6D11;
+    --success-bg: #EAF3DE;
+    --warning: #854F0B;
+    --warning-bg: #FAEEDA;
+    --info: #185FA5;
+    --info-bg: #E6F1FB;
+    --purple: #534AB7;
+    --purple-bg: #EEEDFE;
+    --danger: #A32D2D;
+    --danger-bg: #FCEBEB;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.07);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans TC', sans-serif; background: var(--gray-50); color: var(--gray-800); min-height: 100vh; }
+
+  /* ── LOGIN SCREEN ── */
+  #login-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 2rem;
+  }
+  .login-card {
+    background: var(--white); border-radius: 16px; border: 1px solid var(--gray-200);
+    padding: 3rem 2.5rem; max-width: 400px; width: 100%; text-align: center;
+    box-shadow: 0 4px 24px rgba(91,33,244,0.08);
+  }
+  .login-logo {
+    width: 56px; height: 56px; background: var(--brand); border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;
+  }
+  .login-logo svg { width: 32px; height: 32px; }
+  .login-company { font-size: 13px; color: var(--gray-400); margin-bottom: 4px; letter-spacing: 0.03em; }
+  .login-title { font-size: 22px; font-weight: 600; color: var(--gray-800); margin-bottom: 0.5rem; }
+  .login-sub { font-size: 14px; color: var(--gray-600); margin-bottom: 2rem; line-height: 1.6; }
+  .login-divider { border: none; border-top: 1px solid var(--gray-200); margin: 1.5rem 0; }
+  .login-note { font-size: 12px; color: var(--gray-400); margin-top: 1.25rem; line-height: 1.6; }
+  #g_id_signin { display: flex; justify-content: center; }
+
+  /* ── ACCESS DENIED ── */
+  #denied-screen {
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 2rem; text-align: center;
+  }
+  .denied-icon { font-size: 48px; margin-bottom: 1rem; }
+  .denied-title { font-size: 20px; font-weight: 600; color: var(--gray-800); margin-bottom: 0.5rem; }
+  .denied-sub { font-size: 14px; color: var(--gray-600); margin-bottom: 1.5rem; }
+  .btn-signout { font-size: 13px; padding: 8px 20px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200); background: var(--white); color: var(--gray-600); cursor: pointer; }
+
+  /* ── MAIN APP ── */
+  #app { display: none; }
+  .topbar {
+    background: var(--white); border-bottom: 1px solid var(--gray-200);
+    padding: 0 1.5rem; height: 56px; display: flex; align-items: center; gap: 12px;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar-logo {
+    width: 32px; height: 32px; background: var(--brand); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .topbar-logo svg { width: 18px; height: 18px; }
+  .topbar-name { font-size: 15px; font-weight: 600; color: var(--gray-800); flex: 1; }
+  .topbar-name span { font-weight: 400; color: var(--gray-400); font-size: 13px; margin-left: 6px; }
+  .user-avatar {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--brand-light);
+    border: 2px solid var(--brand); display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; color: var(--brand); cursor: pointer; overflow: hidden; flex-shrink: 0;
+  }
+  .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  .main { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+
+  /* stats */
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 1.25rem; }
+  .stat { background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 0.875rem 1rem; }
+  .stat-label { font-size: 12px; color: var(--gray-400); margin-bottom: 4px; }
+  .stat-num { font-size: 24px; font-weight: 600; color: var(--gray-800); }
+  .stat-num.c-brand { color: var(--brand); }
+
+  /* toolbar */
+  .toolbar { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+  .chip { font-size: 13px; padding: 5px 14px; border-radius: 99px; border: 1px solid var(--gray-200); background: transparent; color: var(--gray-600); cursor: pointer; transition: all 0.12s; white-space: nowrap; }
+  .chip:hover { background: var(--gray-100); }
+  .chip.active { background: var(--brand); color: var(--white); border-color: var(--brand); }
+  .btn-add { margin-left: auto; font-size: 13px; padding: 7px 18px; border-radius: var(--radius-sm); border: none; background: var(--brand); color: var(--white); cursor: pointer; font-weight: 500; white-space: nowrap; }
+  .btn-add:hover { background: var(--brand-dark); }
+
+  /* order cards */
+  .orders { display: flex; flex-direction: column; gap: 8px; }
+  .order-card {
+    background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius);
+    overflow: hidden; transition: border-color 0.12s, box-shadow 0.12s;
+  }
+  .order-card:hover { border-color: #C4B5FD; box-shadow: var(--shadow); }
+  .order-card.expanded { border-color: var(--brand); }
+  .order-top { display: flex; align-items: center; gap: 10px; padding: 0.875rem 1.25rem; cursor: pointer; flex-wrap: wrap; }
+  .order-id { font-size: 13px; font-weight: 600; color: var(--gray-800); min-width: 100px; }
+  .order-name { font-size: 13px; color: var(--gray-600); flex: 1; min-width: 80px; }
+  .badge { font-size: 11px; padding: 3px 10px; border-radius: 99px; font-weight: 500; white-space: nowrap; }
+  .b-wait   { background: var(--gray-100);   color: var(--gray-600); }
+  .b-mat    { background: var(--info-bg);    color: var(--info); }
+  .b-prod   { background: var(--warning-bg); color: var(--warning); }
+  .b-qc     { background: var(--purple-bg);  color: var(--purple); }
+  .b-done   { background: var(--success-bg); color: var(--success); }
+  .due-tag { font-size: 12px; color: var(--gray-400); white-space: nowrap; }
+  .due-tag.overdue { color: var(--danger); font-weight: 600; }
+  .client-tag { font-size: 12px; color: var(--gray-400); }
+
+  .prog-bar { height: 3px; background: var(--gray-100); }
+  .prog-fill { height: 100%; transition: width 0.4s; }
+
+  /* expanded steps */
+  .order-detail { display: none; padding: 1rem 1.25rem 1.25rem; border-top: 1px solid var(--gray-100); }
+  .order-detail.open { display: block; }
+  .steps { display: flex; flex-direction: column; gap: 0; margin-bottom: 1rem; }
+  .step { display: flex; gap: 12px; padding: 7px 0; position: relative; }
+  .step-line { position: absolute; left: 9px; top: 22px; bottom: -7px; width: 1px; background: var(--gray-200); }
+  .step:last-child .step-line { display: none; }
+  .step-dot {
+    width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--gray-200);
+    background: var(--white); flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    margin-top: 1px; z-index: 1;
+  }
+  .step-dot.done   { background: var(--success); border-color: var(--success); }
+  .step-dot.active { background: var(--brand);   border-color: var(--brand); }
+  .step-dot svg { width: 10px; height: 10px; }
+  .step-label { font-size: 13px; font-weight: 500; color: var(--gray-800); }
+  .step-meta  { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
+  .step-input { font-size: 12px; padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200); background: var(--gray-50); color: var(--gray-800); margin-top: 4px; }
+
+  .stage-btns { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 0.75rem; border-top: 1px solid var(--gray-100); }
+  .stage-btn { font-size: 12px; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--gray-200); background: transparent; color: var(--gray-600); cursor: pointer; transition: all 0.12s; }
+  .stage-btn.active { background: var(--brand); color: var(--white); border-color: var(--brand); }
+  .stage-btn:hover:not(.active) { background: var(--gray-100); }
+
+  /* modal */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; align-items: center; justify-content: center; padding: 1rem; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--white); border-radius: 14px; padding: 1.75rem; width: min(440px, 100%); max-height: 90vh; overflow-y: auto; }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 1.25rem; color: var(--gray-800); }
+  .form-row { margin-bottom: 0.875rem; }
+  .form-label { font-size: 13px; color: var(--gray-600); margin-bottom: 4px; display: block; }
+  .form-input { width: 100%; font-size: 14px; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200); background: var(--gray-50); color: var(--gray-800); }
+  .form-input:focus { outline: none; border-color: var(--brand); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; }
+  .btn-cancel { font-size: 13px; padding: 8px 18px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200); background: transparent; color: var(--gray-600); cursor: pointer; }
+  .btn-save { font-size: 13px; padding: 8px 18px; border-radius: var(--radius-sm); border: none; background: var(--brand); color: var(--white); cursor: pointer; font-weight: 500; }
+  .btn-save:hover { background: var(--brand-dark); }
+
+  .empty { padding: 3rem; text-align: center; color: var(--gray-400); font-size: 14px; }
+
+  @media (max-width: 520px) {
+    .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .order-name, .client-tag { display: none; }
+    .topbar-name span { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="6" y="6" width="20" height="20" rx="2" stroke="white" stroke-width="2" fill="none"/>
+        <rect x="10" y="10" width="12" height="12" rx="1" stroke="white" stroke-width="1.5" fill="none"/>
+        <rect x="14" y="14" width="4" height="4" rx="0.5" fill="white"/>
+      </svg>
+    </div>
+    <div class="login-company">弘丞精密工業有限公司</div>
+    <div class="login-title">HCPI 訂單系統</div>
+    <div class="login-sub">僅限公司人員登入使用<br>請使用公司授權的 Google 帳號</div>
+    <hr class="login-divider" />
+    <div id="g_id_signin"></div>
+    <div class="login-note">如無法登入，請聯繫管理員確認<br>您的帳號是否已取得存取權限</div>
+  </div>
+</div>
+
+<!-- ── ACCESS DENIED ── -->
+<div id="denied-screen">
+  <div class="denied-icon">🔒</div>
+  <div class="denied-title">無存取權限</div>
+  <div class="denied-sub" id="denied-email"></div>
+  <button class="btn-signout" onclick="signOut()">登出，換帳號試試</button>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">
+      <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="6" y="6" width="20" height="20" rx="2" stroke="white" stroke-width="2" fill="none"/>
+        <rect x="10" y="10" width="12" height="12" rx="1" stroke="white" stroke-width="1.5" fill="none"/>
+        <rect x="14" y="14" width="4" height="4" rx="0.5" fill="white"/>
+      </svg>
+    </div>
+    <div class="topbar-name">HCPI <span>訂單進度系統</span></div>
+    <div class="user-avatar" id="user-avatar" title="登出" onclick="signOut()"></div>
+  </div>
+
+  <div class="main">
+    <div class="stats" id="stats"></div>
+    <div class="toolbar">
+      <button class="chip active" onclick="setFilter('all',this)">全部</button>
+      <button class="chip" onclick="setFilter('待入料',this)">待入料</button>
+      <button class="chip" onclick="setFilter('入料中',this)">入料中</button>
+      <button class="chip" onclick="setFilter('生產中',this)">生產中</button>
+      <button class="chip" onclick="setFilter('品檢中',this)">品檢中</button>
+      <button class="chip" onclick="setFilter('完成',this)">完成</button>
+      <button class="btn-add" onclick="openModal()">+ 新增訂單</button>
+    </div>
+    <div class="orders" id="orders"></div>
+  </div>
+</div>
+
+<!-- ── NEW ORDER MODAL ── -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <div class="modal-title">新增訂單</div>
+    <div class="form-row"><label class="form-label">訂單編號</label><input class="form-input" id="f-id" placeholder="例：PO-2026-042" /></div>
+    <div class="form-row"><label class="form-label">產品名稱</label><input class="form-input" id="f-name" placeholder="例：鋁合金支架 A型" /></div>
+    <div class="form-row"><label class="form-label">客戶名稱</label><input class="form-input" id="f-client" placeholder="例：台灣精機有限公司" /></div>
+    <div class="form-row"><label class="form-label">交貨日期</label><input class="form-input" id="f-due" type="date" /></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-save" onclick="saveOrder()">儲存訂單</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  ★ 管理員設定區 ★
+// ══════════════════════════════════════
+const ALLOWED_EMAILS = [
+  'ming.chia7@gmail.com',
+  'engineer@hcpi.com.tw',
+];
+
+const GOOGLE_CLIENT_ID = '383017876396-gb80d9p28n287f1iqi98o5mjmr5sv8d.apps.googleusercontent.com';
+
+// ── Firebase 設定 ──
+const firebaseConfig = {
+  apiKey: "AIzaSyBFbGFazvMc-S6jN-vyuSt6I6ryvjDIRhE",
+  authDomain: "hcpi-order-system.firebaseapp.com",
+  projectId: "hcpi-order-system",
+  storageBucket: "hcpi-order-system.firebasestorage.app",
+  messagingSenderId: "950890521894",
+  appId: "1:950890521894:web:5580143e80b484570e4de7"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ══════════════════════════════════════
+const STAGES = ['待入料','入料中','生產中','品檢中','完成'];
+const PROG   = { '待入料':0, '入料中':25, '生產中':55, '品檢中':80, '完成':100 };
+const BADGE  = { '待入料':'b-wait','入料中':'b-mat','生產中':'b-prod','品檢中':'b-qc','完成':'b-done' };
+const COLORS = { '待入料':'#B4B2A9','入料中':'#378ADD','生產中':'#EF9F27','品檢中':'#7F77DD','完成':'#639922' };
+
+let orders = [];
+let expanded = null;
+let filter = 'all';
+
+// ── Google Sign-In ──
+function initGoogleLogin() {
+  if (typeof google === 'undefined') { setTimeout(initGoogleLogin, 300); return; }
+  google.accounts.id.initialize({
+    client_id: '383017876396-gb80d9p28n287f1iqi98o5mjmr5sv8d.apps.googleusercontent.com',
+    callback: handleCredential,
+    auto_select: false,
+    ux_mode: 'popup',
+  });
+  google.accounts.id.renderButton(
+    document.getElementById('g_id_signin'),
+    { theme: 'outline', size: 'large', text: 'signin_with', locale: 'zh-TW', width: 280 }
+  );
+  google.accounts.id.prompt();
+}
+window.addEventListener('load', initGoogleLogin);
+
+function handleCredential(response) {
+  const payload = parseJwt(response.credential);
+  const email = payload.email;
+  if (ALLOWED_EMAILS.includes(email)) {
+    showApp(payload);
+  } else {
+    document.getElementById('denied-email').textContent = email + ' 無權限存取此系統';
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('denied-screen').style.display = 'flex';
+  }
+}
+
+function showApp(payload) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  const av = document.getElementById('user-avatar');
+  if (payload.picture) {
+    av.innerHTML = `<img src="${payload.picture}" alt="avatar" />`;
+  } else {
+    av.textContent = (payload.name || payload.email)[0].toUpperCase();
+  }
+  loadOrders();
+}
+
+function signOut() {
+  google.accounts.id.disableAutoSelect();
+  location.reload();
+}
+
+function parseJwt(token) {
+  const base64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  return JSON.parse(decodeURIComponent(atob(base64).split('').map(c => '%' + ('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+}
+
+// ── Firebase 資料操作 ──
+function loadOrders() {
+  document.getElementById('orders').innerHTML = '<div class="empty">載入中...</div>';
+  db.collection('orders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+    orders = snapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+    renderStats();
+    renderOrders();
+  });
+}
+
+function changeStage(id, stage) {
+  const order = orders.find(o => o.id === id);
+  if (!order) return;
+  db.collection('orders').doc(order.docId).update({ stage });
+}
+
+function updateStep(id, key, val) {
+  const order = orders.find(o => o.id === id);
+  if (!order) return;
+  expanded = id;
+  db.collection('orders').doc(order.docId).update({ [key]: val });
+}
+
+function saveOrder() {
+  const id = document.getElementById('f-id').value.trim();
+  const name = document.getElementById('f-name').value.trim();
+  const client = document.getElementById('f-client').value.trim();
+  const due = document.getElementById('f-due').value;
+  if (!id || !name || !due) { alert('請填寫訂單編號、產品名稱及交貨日期'); return; }
+  db.collection('orders').add({
+    id, name, client, due,
+    stage: '待入料',
+    mat: '', prod: '', qc: '', ship: '',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  closeModal();
+  ['f-id','f-name','f-client','f-due'].forEach(f => document.getElementById(f).value = '');
+}
+
+// ── Render ──
+function renderStats() {
+  const now = new Date();
+  const week = new Date(now.getTime() + 7*86400000);
+  const active = orders.filter(o => o.stage !== '完成').length;
+  const urgent = orders.filter(o => { const d=new Date(o.due); return d>=now && d<=week && o.stage!=='完成'; }).length;
+  const overdue = orders.filter(o => o.stage !== '完成' && new Date(o.due) < now).length;
+  document.getElementById('stats').innerHTML = [
+    ['全部訂單', orders.length, ''],
+    ['進行中', active, 'c-brand'],
+    ['本週到期', urgent, urgent>0 ? 'c-brand' : ''],
+    ['逾期未完成', overdue, overdue>0 ? '' : ''],
+  ].map(([l,n,cls]) => `<div class="stat"><div class="stat-label">${l}</div><div class="stat-num ${cls}">${n}</div></div>`).join('');
+}
+
+function renderOrders() {
+  const list = filter === 'all' ? orders : orders.filter(o => o.stage === filter);
+  const el = document.getElementById('orders');
+  if (!list.length) { el.innerHTML = '<div class="empty">沒有符合條件的訂單</div>'; return; }
+  el.innerHTML = list.map(o => {
+    const over = o.stage !== '完成' && new Date(o.due) < new Date();
+    const pct  = PROG[o.stage];
+    const isExp = expanded === o.id;
+    const stageIdx = STAGES.indexOf(o.stage);
+    const steps = [
+      { key:'mat',  label:'入料到廠' },
+      { key:'prod', label:'生產完成' },
+      { key:'qc',   label:'品檢通過' },
+      { key:'ship', label:'出貨'     },
+    ];
+    return `
+    <div class="order-card ${isExp?'expanded':''}">
+      <div class="order-top" onclick="toggleExpand('${o.id}')">
+        <span class="order-id">${o.id}</span>
+        <span class="order-name">${o.name}</span>
+        <span class="badge ${BADGE[o.stage]}">${o.stage}</span>
+        <span class="due-tag ${over?'overdue':''}">${over?'⚠ ':''}交期 ${o.due}</span>
+        <span class="client-tag">${o.client}</span>
+      </div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${COLORS[o.stage]};"></div></div>
+      <div class="order-detail ${isExp?'open':''}">
+        <div class="steps">
+          ${steps.map((s,i) => {
+            const done = o[s.key] !== '';
+            const active = !done && i === stageIdx - 1;
+            return `<div class="step">
+              <div class="step-dot ${done?'done':active?'active':''}">
+                ${done?`<svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`:''}
+              </div>
+              <div class="step-line"></div>
+              <div>
+                <div class="step-label">${s.label}</div>
+                ${done
+                  ? `<div class="step-meta">完成於 ${o[s.key]}</div>`
+                  : `<input class="step-input" type="date" onchange="updateStep('${o.id}','${s.key}',this.value)" />`}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="stage-btns">
+          ${STAGES.map(s => `<button class="stage-btn ${o.stage===s?'active':''}" onclick="changeStage('${o.id}','${s}')">${s}</button>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleExpand(id) { expanded = expanded===id ? null : id; renderOrders(); }
+function setFilter(f, btn) { filter=f; document.querySelectorAll('.chip').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderOrders(); }
+function openModal()  { document.getElementById('modal').classList.add('open'); }
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+</script>
+</body>
+</html>
