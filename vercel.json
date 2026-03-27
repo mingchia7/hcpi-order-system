@@ -1,5 +1,6 @@
 {
-     "rewrites": [
-       { "source": "/", "destination": "/hcpi-order-tracker.html" }
-     ]
-   }
+  "rewrites": [
+    { "source": "/operator-report.html", "destination": "/operator-report.html" },
+    { "source": "/", "destination": "/hcpi-order-tracker.html" }
+  ]
+}
