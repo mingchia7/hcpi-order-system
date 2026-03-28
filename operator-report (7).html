@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>HCPI 生產填報</title>
+<style>
+:root{
+  --brand:#5B21F4;--brand-dark:#4318C4;--brand-light:#EDE9FD;
+  --gray-50:#F9F9F9;--gray-100:#F1F1F1;--gray-200:#E2E2E2;
+  --gray-400:#A0A0A0;--gray-600:#5A5A5A;--gray-800:#222222;--white:#FFFFFF;
+  --success:#3B6D11;--success-bg:#EAF3DE;--warning:#854F0B;--warning-bg:#FAEEDA;
+  --danger:#A32D2D;--danger-bg:#FCEBEB;--radius:12px;--radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif;background:var(--gray-50);color:var(--gray-800);min-height:100vh;}
+.header{background:var(--brand);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:12px;}
+.header-logo{width:36px;height:36px;object-fit:contain;}
+.header-title{color:white;font-size:16px;font-weight:600;}
+.header-sub{color:rgba(255,255,255,0.7);font-size:12px;margin-top:2px;}
+.machine-badge{background:rgba(255,255,255,0.2);color:white;font-size:13px;font-weight:600;padding:6px 14px;border-radius:99px;margin-left:auto;white-space:nowrap;}
+.main{max-width:480px;margin:0 auto;padding:1.5rem;}
+.card{background:var(--white);border-radius:var(--radius);border:1px solid var(--gray-200);padding:1.5rem;margin-bottom:1rem;}
+.card-title{font-size:14px;font-weight:600;color:var(--gray-800);margin-bottom:1rem;display:flex;align-items:center;gap:8px;}
+.card-title-dot{width:8px;height:8px;border-radius:50%;background:var(--brand);}
+.form-row{margin-bottom:1rem;}
+.form-label{font-size:13px;color:var(--gray-600);margin-bottom:6px;display:block;font-weight:500;}
+.form-input{width:100%;font-size:16px;padding:12px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:var(--gray-50);color:var(--gray-800);-webkit-appearance:none;}
+.form-input:focus{outline:none;border-color:var(--brand);background:var(--white);}
+.form-select{width:100%;font-size:16px;padding:12px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:var(--gray-50);color:var(--gray-800);-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23A0A0A0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;}
+.date-display{font-size:16px;padding:12px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-100);background:var(--gray-100);color:var(--gray-600);}
+.qty-row{display:flex;align-items:center;gap:6px;width:100%;overflow:hidden;}
+.qty-input{flex:1;min-width:0;font-size:22px;font-weight:600;padding:10px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:var(--gray-50);color:var(--gray-800);text-align:center;-webkit-appearance:none;}
+.qty-input:focus{outline:none;border-color:var(--brand);background:var(--white);}
+.qty-unit{font-size:14px;color:var(--gray-400);font-weight:500;white-space:nowrap;}
+.qty-btn{width:40px;height:44px;min-width:40px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:var(--white);font-size:18px;color:var(--gray-600);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.toggle-row{display:flex;gap:8px;margin-bottom:8px;}
+.toggle-btn{flex:1;font-size:13px;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:transparent;color:var(--gray-600);cursor:pointer;text-align:center;}
+.toggle-btn.active{border-color:var(--brand);background:var(--brand-light);color:var(--brand);font-weight:600;}
+.order-preview{background:var(--gray-50);border-radius:var(--radius-sm);padding:10px 12px;margin-top:8px;font-size:13px;display:none;}
+.order-preview-title{color:var(--gray-400);font-size:12px;margin-bottom:6px;}
+.order-preview-item{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;margin-bottom:4px;border:1.5px solid var(--gray-200);}
+.order-preview-item:hover{background:var(--brand-light);border-color:var(--brand);}
+.order-preview-item.selected{background:var(--brand-light);border-color:var(--brand);}
+.order-preview-name{color:var(--gray-800);font-weight:500;}
+.order-preview-remaining{color:var(--brand);font-size:12px;}
+.btn-submit{width:100%;font-size:17px;font-weight:600;padding:16px;border-radius:var(--radius);border:none;background:var(--brand);color:var(--white);cursor:pointer;margin-top:.5rem;}
+.btn-submit:active{background:var(--brand-dark);}
+.btn-submit:disabled{background:var(--gray-200);color:var(--gray-400);cursor:not-allowed;}
+.success-screen{display:none;padding:1.5rem;}
+.success-header{text-align:center;margin-bottom:1.5rem;}
+.success-icon{width:64px;height:64px;background:var(--success-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:28px;}
+.success-title{font-size:20px;font-weight:600;color:var(--success);}
+.alloc-card{background:var(--white);border-radius:var(--radius);border:1px solid var(--gray-200);padding:1.25rem;margin-bottom:1rem;}
+.alloc-title{font-size:13px;font-weight:600;color:var(--gray-600);margin-bottom:10px;}
+.alloc-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray-100);}
+.alloc-item:last-child{border-bottom:none;}
+.alloc-order{font-size:13px;color:var(--gray-800);}
+.alloc-order-id{font-size:11px;color:var(--gray-400);margin-top:2px;}
+.alloc-qty{font-size:15px;font-weight:600;color:var(--success);}
+.alloc-unassigned{color:var(--warning);}
+.btn-again{width:100%;font-size:15px;font-weight:500;padding:13px;border-radius:var(--radius);border:2px solid var(--brand);background:transparent;color:var(--brand);cursor:pointer;}
+.error-screen{display:none;text-align:center;padding:3rem 1.5rem;}
+.error-icon{font-size:48px;margin-bottom:1rem;}
+.error-title{font-size:18px;font-weight:600;color:var(--danger);margin-bottom:.5rem;}
+.error-sub{font-size:14px;color:var(--gray-600);line-height:1.6;}
+.loading-text{text-align:center;padding:1rem;font-size:13px;color:var(--gray-400);}
+</style>
+</head>
+<body>
+
+<div id="form-screen">
+  <div class="header">
+    <img class="header-logo" src="https://raw.githubusercontent.com/mingchia7/hcpi-order-system/main/logo.png" onerror="this.style.display='none'" />
+    <div>
+      <div class="header-title">HCPI 生產填報</div>
+      <div class="header-sub">弘丞精密工業有限公司</div>
+    </div>
+    <div class="machine-badge" id="machine-badge">載入中...</div>
+  </div>
+
+  <div class="main">
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>機台資訊</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div><div class="form-label">廠別</div><div class="date-display" id="display-factory">-</div></div>
+        <div><div class="form-label">機台</div><div class="date-display" id="display-machine">-</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>填報資料</div>
+
+      <div class="form-row">
+        <label class="form-label">操作員姓名</label>
+        <input class="form-input" id="input-name" type="text" placeholder="請輸入您的姓名" autocomplete="name" />
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">工段</label>
+        <select class="form-select" id="input-section">
+          <option value="">請選擇工段</option>
+          <option value="車工1">車工1</option><option value="車工2">車工2</option>
+          <option value="車工3">車工3</option><option value="車工4">車工4</option>
+          <option value="車工5">車工5</option><option value="銑工1">銑工1</option>
+          <option value="銑工2">銑工2</option><option value="銑工3">銑工3</option>
+          <option value="銑工4">銑工4</option><option value="銑工5">銑工5</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">品名</label>
+        <div class="toggle-row">
+          <button class="toggle-btn active" id="toggle-select" onclick="switchProductMode('select')">從訂單選擇</button>
+          <button class="toggle-btn" id="toggle-manual" onclick="switchProductMode('manual')">手動輸入</button>
+        </div>
+        <div id="product-select-wrap">
+          <div class="loading-text" id="product-loading">載入訂單中...</div>
+          <select class="form-select" id="input-product-select" style="display:none;" onchange="onProductSelect()">
+            <option value="">請選擇品名</option>
+          </select>
+          <div class="order-preview" id="order-preview">
+            <div class="order-preview-title">此品名目前進行中的訂單：</div>
+            <div id="order-preview-list"></div>
+          </div>
+        </div>
+        <div id="product-manual-wrap" style="display:none;">
+          <input class="form-input" id="input-product-manual" type="text" placeholder="請輸入品名" oninput="onManualInput()" />
+          <div class="order-preview" id="manual-order-preview" style="display:none;">
+            <div class="order-preview-title">找到符合的訂單，請選擇：</div>
+            <div id="manual-order-list"></div>
+            <div style="font-size:12px;color:var(--gray-400);margin-top:6px;padding-top:6px;border-top:1px solid var(--gray-200);">
+              若無對應訂單，填報將存入未分配紀錄
+              <label style="display:flex;align-items:center;gap:6px;margin-top:4px;cursor:pointer;">
+                <input type="checkbox" id="manual-no-order" onchange="onNoOrderCheck()" />
+                <span>此品名目前無對應訂單</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">生產數量</label>
+        <div class="qty-row">
+          <button class="qty-btn" onclick="adjustQty(-10)">−−</button>
+          <button class="qty-btn" onclick="adjustQty(-1)">−</button>
+          <input class="qty-input" id="input-qty" type="number" min="0" value="0" inputmode="numeric" />
+          <button class="qty-btn" onclick="adjustQty(1)">+</button>
+          <button class="qty-btn" onclick="adjustQty(10)">++</button>
+          <span class="qty-unit">pcs</span>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">生產時間</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <div style="font-size:12px;color:var(--gray-400);margin-bottom:4px;">開始時間</div>
+            <select class="form-select" id="input-start-time" style="font-size:15px;padding:10px 12px;">
+              <option value="">請選擇</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--gray-400);margin-bottom:4px;">結束時間</div>
+            <select class="form-select" id="input-end-time" style="font-size:15px;padding:10px 12px;">
+              <option value="">請選擇</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">填報日期</label>
+        <div class="date-display" id="display-date">今天</div>
+      </div>
+    </div>
+
+    <button class="btn-submit" id="btn-submit" onclick="submitReport()">送出填報</button>
+  </div>
+</div>
+
+<div class="success-screen" id="success-screen">
+  <div class="success-header">
+    <div class="success-icon">✓</div>
+    <div class="success-title">填報成功！</div>
+  </div>
+  <div class="alloc-card">
+    <div class="alloc-title">數量分配明細</div>
+    <div id="alloc-list"></div>
+  </div>
+  <button class="btn-again" onclick="resetForm()">繼續填報</button>
+</div>
+
+<div class="error-screen" id="error-screen">
+  <div class="error-icon">⚠️</div>
+  <div class="error-title">無效的機台連結</div>
+  <div class="error-sub">請掃描機台上的 QR Code 進入填報頁面</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBFbGFazvMc-S6jN-vyuSt6I6ryvjDIRhE",
+  authDomain: "hcpi-order-system.firebaseapp.com",
+  projectId: "hcpi-order-system",
+  storageBucket: "hcpi-order-system.firebasestorage.app",
+  messagingSenderId: "950890521894",
+  appId: "1:950890521894:web:5580143e80b484570e4de7"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const params = new URLSearchParams(window.location.search);
+const factory = params.get('factory') || '';
+const machine  = params.get('machine') || '';
+const todayISO = new Date().toISOString().split('T')[0];
+const todayDisplay = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
+
+let productMode = 'select';
+let activeOrders = [];   // 所有進行中訂單
+let matchedOrders = [];  // 選定品名後符合的訂單
+
+if (!factory || !machine) {
+  document.getElementById('form-screen').style.display='none';
+  document.getElementById('error-screen').style.display='block';
+} else {
+  document.getElementById('machine-badge').textContent = machine;
+  document.getElementById('display-factory').textContent = factory;
+  document.getElementById('display-machine').textContent = machine;
+  document.getElementById('display-date').textContent = todayDisplay;
+
+  // 產生時間選項（每30分鐘一格，06:00～22:00）
+  const timeOptions = [];
+  for (let h=6; h<=22; h++) {
+    ['00','30'].forEach(m => {
+      const t = `${String(h).padStart(2,'0')}:${m}`;
+      timeOptions.push(`<option value="${t}">${t}</option>`);
+    });
+  }
+  const timeHtml = '<option value="">請選擇</option>' + timeOptions.join('');
+  document.getElementById('input-start-time').innerHTML = timeHtml;
+  document.getElementById('input-end-time').innerHTML = timeHtml;
+
+  // 自動帶入目前時間（最近的30分鐘）
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = now.getMinutes() < 30 ? '00' : '30';
+  document.getElementById('input-start-time').value = `${hh}:${mm}`;
+
+  loadActiveOrders();
+}
+
+function loadActiveOrders() {
+  db.collection('orders')
+    .orderBy('createdAt','asc')
+    .get()
+    .then(snapshot => {
+      activeOrders = snapshot.docs.map(d=>({docId:d.id,...d.data()})).filter(o=>['入料中','生產中','生產完成'].includes(o.stage));
+      // 取出不重複品名
+      const names = [...new Set(activeOrders.map(o=>o.name).filter(Boolean))];
+      const sel = document.getElementById('input-product-select');
+      sel.innerHTML = '<option value="">請選擇品名</option>' +
+        names.map(n=>`<option value="${n}">${n}</option>`).join('');
+      document.getElementById('product-loading').style.display='none';
+      sel.style.display='block';
+    })
+    .catch(()=>{
+      document.getElementById('product-loading').textContent='載入失敗，請手動輸入';
+      switchProductMode('manual');
+    });
+}
+
+function onProductSelect() {
+  const name = document.getElementById('input-product-select').value;
+  const preview = document.getElementById('order-preview');
+  const list = document.getElementById('order-preview-list');
+  if (!name) { preview.style.display='none'; matchedOrders=[]; return; }
+
+  matchedOrders = activeOrders.filter(o=>o.name===name);
+  if (!matchedOrders.length) { preview.style.display='none'; return; }
+
+  preview.style.display='block';
+  list.innerHTML = matchedOrders.map(o=>{
+    const total = parseInt(o.totalQty)||0;
+    const shipped = Array.isArray(o.shipLogs)?o.shipLogs.reduce((s,l)=>s+parseInt(l.qty||0),0):0;
+    const defects = Array.isArray(o.shipLogs)?o.shipLogs.reduce((s,l)=>s+parseInt(l.defect||0),0):0;
+    const prodDone = Array.isArray(o.prodLogs)?o.prodLogs.reduce((s,l)=>s+parseInt(l.qty||0),0):0;
+    const remaining = total>0 ? Math.max(0, total-prodDone) : '未設定';
+    return `<div class="order-preview-item">
+      <div>
+        <div class="order-preview-name">${o.id}</div>
+        <div style="font-size:11px;color:var(--gray-400);">客戶：${o.client||'-'} ・ 總量：${total||'-'} pcs</div>
+      </div>
+      <div class="order-preview-remaining">剩 ${remaining} pcs</div>
+    </div>`;
+  }).join('');
+}
+
+let selectedManualOrders = []; // 手動輸入時選取的訂單
+
+function onManualInput() {
+  const keyword = document.getElementById('input-product-manual').value.trim();
+  const preview = document.getElementById('manual-order-preview');
+  const list = document.getElementById('manual-order-list');
+  document.getElementById('manual-no-order').checked = false;
+  selectedManualOrders = [];
+  if (!keyword) { preview.style.display='none'; return; }
+  const matched = activeOrders.filter(o => o.name && o.name.includes(keyword));
+  if (!matched.length) { preview.style.display='none'; return; }
+  preview.style.display='block';
+  list.innerHTML = matched.map(o => {
+    const total = parseInt(o.totalQty)||0;
+    const prodDone = Array.isArray(o.prodLogs)?o.prodLogs.reduce((s,l)=>s+parseInt(l.qty||0),0):0;
+    const remaining = total>0 ? Math.max(0, total-prodDone) : '未設定';
+    return `<div class="order-preview-item" id="manual-order-${o.docId}" onclick="toggleManualOrder('${o.docId}')">
+      <div>
+        <div class="order-preview-name">${o.name}</div>
+        <div style="font-size:11px;color:var(--gray-400);">${o.id} ・ 客戶：${o.client||'-'} ・ 總量：${total||'-'} pcs</div>
+      </div>
+      <div class="order-preview-remaining">剩 ${remaining} pcs</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleManualOrder(docId) {
+  const el = document.getElementById('manual-order-'+docId);
+  const idx = selectedManualOrders.indexOf(docId);
+  if (idx>=0) {
+    selectedManualOrders.splice(idx,1);
+    el.classList.remove('selected');
+  } else {
+    selectedManualOrders.push(docId);
+    el.classList.add('selected');
+  }
+}
+
+function onNoOrderCheck() {
+  const checked = document.getElementById('manual-no-order').checked;
+  if (checked) {
+    selectedManualOrders = [];
+    document.querySelectorAll('.order-preview-item').forEach(el=>el.classList.remove('selected'));
+  }
+}
+
+function switchProductMode(mode) {
+  productMode = mode;
+  document.getElementById('toggle-select').classList.toggle('active', mode==='select');
+  document.getElementById('toggle-manual').classList.toggle('active', mode==='manual');
+  document.getElementById('product-select-wrap').style.display = mode==='select'?'block':'none';
+  document.getElementById('product-manual-wrap').style.display = mode==='manual'?'block':'none';
+  if (mode==='manual') { matchedOrders=[]; selectedManualOrders=[]; }
+  if (mode==='select') { document.getElementById('manual-order-preview').style.display='none'; selectedManualOrders=[]; }
+}
+
+function adjustQty(delta) {
+  const el = document.getElementById('input-qty');
+  el.value = Math.max(0, (parseInt(el.value)||0)+delta);
+}
+
+function getProductName() {
+  return productMode==='select'
+    ? document.getElementById('input-product-select').value
+    : document.getElementById('input-product-manual').value.trim();
+}
+
+// ── 模糊比對訂單 ──
+function fuzzyMatchOrders(productName) {
+  const input = productName.toLowerCase().trim();
+  return activeOrders.filter(o => {
+    const name = (o.name||'').toLowerCase();
+    // 完全包含、或訂單名稱包含輸入、或輸入包含訂單名稱
+    return name.includes(input) || input.includes(name) ||
+      // 比對每個字元相似度（至少60%）
+      [...input].filter(c => name.includes(c)).length / Math.max(input.length, 1) >= 0.6;
+  });
+}
+async function autoDistribute(qty, orders, meta) {
+  let remaining = qty;
+  const allocations = [];
+  const batch = db.batch();
+
+  for (const o of orders) {
+    if (remaining <= 0) break;
+    const total = parseInt(o.totalQty)||0;
+    const prodDone = Array.isArray(o.prodLogs)?o.prodLogs.reduce((s,l)=>s+parseInt(l.qty||0),0):0;
+    const canFill = total>0 ? Math.max(0, total-prodDone) : remaining;
+    const fill = Math.min(remaining, canFill||remaining);
+    if (fill <= 0) continue;
+
+    const newLog = { date:todayISO, loc:factory, machine, section:meta.section, operator:meta.operator, qty:fill, startTime:meta.startTime||'', endTime:meta.endTime||'' };
+    const updatedLogs = [...(Array.isArray(o.prodLogs)?o.prodLogs:[]), newLog];
+
+    // 判斷是否要更新狀態到「生產中」
+    const newStage = o.stage==='入料中' ? '生產中' : o.stage;
+    const ref = db.collection('orders').doc(o.docId);
+    batch.update(ref, { prodLogs: updatedLogs, stage: newStage });
+
+    allocations.push({ orderId: o.id, orderName: o.name, qty: fill, assigned: true });
+    remaining -= fill;
+  }
+
+  // 有剩餘 → 建立未分配紀錄
+  if (remaining > 0) {
+    const unassignedRef = db.collection('unassignedProd').doc();
+    batch.set(unassignedRef, {
+      date: todayISO, factory, machine,
+      section: meta.section, operator: meta.operator,
+      productName: meta.productName, qty: remaining,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    allocations.push({ orderId: '未分配', orderName: meta.productName, qty: remaining, assigned: false });
+  }
+
+  await batch.commit();
+  return allocations;
+}
+
+async function submitReport() {
+  const name = document.getElementById('input-name').value.trim();
+  const section = document.getElementById('input-section').value;
+  const productName = getProductName();
+  const qty = parseInt(document.getElementById('input-qty').value)||0;
+  const startTime = document.getElementById('input-start-time').value;
+  const endTime = document.getElementById('input-end-time').value;
+
+  if (!name) { alert('請填寫操作員姓名'); return; }
+  if (!section) { alert('請選擇工段'); return; }
+  if (!productName) { alert('請填寫品名'); return; }
+  if (qty <= 0) { alert('請填寫生產數量'); return; }
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled=true; btn.textContent='送出中...';
+
+  try {
+    const meta = { operator:name, section, productName, startTime, endTime };
+    let allocations = [];
+
+    if (productMode==='select' && matchedOrders.length > 0) {
+      // 從訂單選擇 → 自動分配
+      allocations = await autoDistribute(qty, matchedOrders, meta);
+    } else if (productMode==='manual') {
+      const noOrder = document.getElementById('manual-no-order').checked;
+      if (selectedManualOrders.length > 0) {
+        // 手動輸入 + 選了訂單 → 分配到選取的訂單
+        const selectedOrderObjs = activeOrders.filter(o=>selectedManualOrders.includes(o.docId));
+        allocations = await autoDistribute(qty, selectedOrderObjs, meta);
+      } else if (noOrder) {
+        // 確認無對應訂單 → 存到未分配
+        await db.collection('prodReports').add({
+          date:todayISO, factory, machine, section,
+          productName, operator:name, qty, startTime, endTime,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        allocations = [{ orderId:'未分配', orderName:productName, qty, assigned:false }];
+      } else {
+        // 有搜尋結果但沒選 → 提示
+        const preview = document.getElementById('manual-order-preview');
+        if (preview.style.display!=='none') {
+          alert('請選擇對應的訂單，或勾選「此品名目前無對應訂單」');
+          btn.disabled=false; btn.textContent='送出填報'; return;
+        }
+        // 沒有搜尋結果 → 直接存未分配
+        await db.collection('prodReports').add({
+          date:todayISO, factory, machine, section,
+          productName, operator:name, qty, startTime, endTime,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        allocations = [{ orderId:'未分配', orderName:productName, qty, assigned:false }];
+      }
+    }
+    }
+
+    // 顯示成功畫面
+    document.getElementById('form-screen').style.display='none';
+    document.getElementById('success-screen').style.display='block';
+    document.getElementById('alloc-list').innerHTML = allocations.map(a=>`
+      <div class="alloc-item">
+        <div>
+          <div class="alloc-order">${a.orderName}</div>
+          <div class="alloc-order-id">${
+            a.orderId==='未分配'?'⚠ 找不到對應訂單，已存為未分配':
+            a.fuzzy?`✦ 模糊比對：${a.orderId}`:
+            a.orderId==='-'?'手動填報':a.orderId
+          }</div>
+        </div>
+        <div class="alloc-qty ${!a.assigned?'alloc-unassigned':''}">+${a.qty} pcs</div>
+      </div>`).join('');
+
+  } catch(e) {
+    console.error(e);
+    alert('送出失敗，請重試');
+    btn.disabled=false; btn.textContent='送出填報';
+  }
+}
+
+function resetForm() {
+  document.getElementById('input-name').value='';
+  document.getElementById('input-section').value='';
+  document.getElementById('input-qty').value='0';
+  document.getElementById('input-product-select').value='';
+  document.getElementById('input-product-manual').value='';
+  document.getElementById('order-preview').style.display='none';
+  document.getElementById('success-screen').style.display='none';
+  document.getElementById('form-screen').style.display='block';
+  document.getElementById('btn-submit').disabled=false;
+  document.getElementById('btn-submit').textContent='送出填報';
+  matchedOrders=[];
+}
+</script>
+</body>
+</html>
