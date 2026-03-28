@@ -1,0 +1,27 @@
+name: Daily LINE Report
+
+on:
+  schedule:
+    - cron: '0 11 * * *'  # 每天 UTC 11:00 = 台灣時間 19:00
+  workflow_dispatch:  # 允許手動觸發測試
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install firebase-admin axios
+
+      - name: Send Daily Report
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_GROUP_ID: C2c7417381e13978b3c8a235f33919a26
+        run: node scripts/sendDailyReport.js
