@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HCPI 庫存管理系統</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{
+  --brand:#5B21F4;--brand-dark:#4318C4;--brand-light:#EDE9FD;
+  --gray-50:#F9F9F9;--gray-100:#F1F1F1;--gray-200:#E2E2E2;
+  --gray-400:#A0A0A0;--gray-600:#5A5A5A;--gray-800:#222222;--white:#FFFFFF;
+  --success:#3B6D11;--success-bg:#EAF3DE;--warning:#854F0B;--warning-bg:#FAEEDA;
+  --info:#185FA5;--info-bg:#E6F1FB;--danger:#A32D2D;--danger-bg:#FCEBEB;
+  --radius:10px;--radius-sm:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif;background:var(--gray-50);color:var(--gray-800);min-height:100vh;}
+.topbar{background:var(--white);border-bottom:1px solid var(--gray-200);padding:0 1.5rem;height:56px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50;}
+.topbar-name{font-size:15px;font-weight:600;color:var(--gray-800);flex:1;}
+.topbar-name span{font-weight:400;color:var(--gray-400);font-size:13px;margin-left:6px;}
+.back-btn{font-size:13px;padding:6px 14px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:transparent;color:var(--gray-600);cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:6px;}
+.back-btn:hover{background:var(--gray-100);}
+.main{max-width:960px;margin:0 auto;padding:1.5rem;}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:1.25rem;}
+.stat{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);padding:.875rem 1rem;}
+.stat-label{font-size:12px;color:var(--gray-400);margin-bottom:4px;}
+.stat-num{font-size:22px;font-weight:600;color:var(--gray-800);}
+.chip{font-size:13px;padding:5px 14px;border-radius:99px;border:1px solid var(--gray-200);background:transparent;color:var(--gray-600);cursor:pointer;transition:all .12s;white-space:nowrap;}
+.chip:hover{background:var(--gray-100);}
+.chip.active{background:var(--brand);color:var(--white);border-color:var(--brand);}
+.btn-add{font-size:13px;padding:7px 18px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:var(--white);cursor:pointer;font-weight:500;white-space:nowrap;}
+.btn-add:hover{background:var(--brand-dark);}
+.badge{font-size:11px;padding:3px 10px;border-radius:99px;font-weight:500;white-space:nowrap;}
+.b-ok{background:var(--success-bg);color:var(--success);}
+.b-low{background:var(--warning-bg);color:var(--warning);}
+.b-out{background:var(--danger-bg);color:var(--danger);}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;padding:1rem;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--white);border-radius:14px;padding:1.75rem;width:min(480px,100%);max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:1.25rem;}
+.form-row{margin-bottom:.875rem;}
+.form-label{font-size:13px;color:var(--gray-600);margin-bottom:4px;display:block;}
+.form-input{width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:var(--gray-50);color:var(--gray-800);}
+.form-input:focus{outline:none;border-color:var(--brand);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem;}
+.btn-cancel{font-size:13px;padding:8px 18px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:transparent;color:var(--gray-600);cursor:pointer;}
+.btn-save{font-size:13px;padding:8px 18px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:var(--white);cursor:pointer;font-weight:500;}
+.inv-card{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);overflow:hidden;margin-bottom:8px;transition:border-color .12s,box-shadow .12s;}
+.inv-card:hover{border-color:#C4B5FD;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.inv-card.expanded{border-color:var(--brand);}
+.inv-top{display:flex;align-items:center;gap:12px;padding:.875rem 1.25rem;cursor:pointer;flex-wrap:wrap;}
+.inv-detail{display:none;padding:1rem 1.25rem 1.25rem;border-top:1px solid var(--gray-100);}
+.inv-detail.open{display:block;}
+.log-item{display:flex;align-items:center;gap:10px;font-size:12px;background:var(--gray-50);border-radius:var(--radius-sm);padding:6px 10px;margin-bottom:4px;}
+.log-date{color:var(--gray-600);min-width:90px;}
+.log-in{font-weight:600;color:var(--success);}
+.log-out{font-weight:600;color:var(--danger);}
+.prog-bar{height:4px;background:var(--gray-100);border-radius:99px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:99px;transition:width .4s;}
+.dash-card{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);padding:1.25rem;}
+.tab-btn{font-size:12px;padding:6px 14px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:transparent;color:var(--gray-600);cursor:pointer;transition:all .12s;white-space:nowrap;}
+.tab-btn.active{background:var(--brand);color:var(--white);border-color:var(--brand);}
+.tab-btn:hover:not(.active){background:var(--gray-100);}
+.empty{padding:3rem;text-align:center;color:var(--gray-400);font-size:14px;}
+.alert-row{background:var(--warning-bg);border:1px solid #F6C05A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="width:36px;height:36px;flex-shrink:0;"><img src="https://raw.githubusercontent.com/mingchia7/hcpi-order-system/main/logo.png" style="width:36px;height:36px;object-fit:contain;" /></div>
+  <div class="topbar-name">HCPI <span>庫存管理系統</span></div>
+  <a href="hcpi-order-tracker.html" class="back-btn">← 返回主系統</a>
+</div>
+
+<div class="main">
+  <div style="font-size:16px;font-weight:600;margin-bottom:1.25rem;">📦 庫存管理</div>
+
+  <!-- 統計卡片 -->
+  <div class="stats" id="inv-stats"></div>
+
+  <!-- 低庫存警告 -->
+  <div id="inv-alerts" style="margin-bottom:1.25rem;"></div>
+
+  <!-- 圖表 -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:1.25rem;">
+    <div class="dash-card"><div style="font-size:14px;font-weight:600;margin-bottom:1rem;">📊 庫存量 Top 10</div><canvas id="chart-inv-top"></canvas></div>
+    <div class="dash-card"><div style="font-size:14px;font-weight:600;margin-bottom:1rem;">📈 近30天出入庫趨勢</div><canvas id="chart-inv-trend"></canvas></div>
+  </div>
+
+  <!-- 子頁籤 -->
+  <div style="display:flex;gap:8px;margin-bottom:1rem;border-bottom:1px solid var(--gray-200);padding-bottom:8px;align-items:center;flex-wrap:wrap;">
+    <button class="tab-btn active" id="tab-products" onclick="switchInvTab('products')">🗃️ 成品庫存</button>
+    <button class="tab-btn" id="tab-logs" onclick="switchInvTab('logs')">📋 出入庫記錄</button>
+    <button class="tab-btn" id="tab-count" onclick="switchInvTab('count')">🔢 庫存盤點</button>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <button onclick="exportInv()" style="font-size:13px;padding:7px 14px;border-radius:var(--radius-sm);border:none;background:var(--success);color:var(--white);cursor:pointer;font-weight:500;">匯出報表</button>
+      <button id="inv-add-btn" class="btn-add" onclick="openModal('product')">+ 新增品項</button>
+    </div>
+  </div>
+
+  <!-- 成品庫存 -->
+  <div id="inv-products-section">
+    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;">
+      <button class="chip active" onclick="setInvFilter('all',this)">全部</button>
+      <button class="chip" onclick="setInvFilter('正常',this)">✅ 正常</button>
+      <button class="chip" onclick="setInvFilter('低庫存',this)">⚠️ 低庫存</button>
+      <button class="chip" onclick="setInvFilter('缺貨',this)">🚨 缺貨</button>
+    </div>
+    <div id="product-list"></div>
+  </div>
+
+  <!-- 出入庫記錄 -->
+  <div id="inv-logs-section" style="display:none;">
+    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;">
+      <button class="chip active" onclick="setLogFilter('all',this)">全部</button>
+      <button class="chip" onclick="setLogFilter('入庫',this)">📥 入庫</button>
+      <button class="chip" onclick="setLogFilter('出庫',this)">📤 出庫</button>
+      <button class="chip" onclick="setLogFilter('調整',this)">🔧 調整</button>
+    </div>
+    <div id="log-list"></div>
+  </div>
+
+  <!-- 庫存盤點 -->
+  <div id="inv-count-section" style="display:none;">
+    <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;">
+      <div style="font-size:14px;font-weight:600;margin-bottom:1rem;">🔢 庫存盤點作業</div>
+      <div style="font-size:13px;color:var(--gray-600);margin-bottom:1rem;">依序核對每個品項的實際庫存量，填入盤點數量後按「確認盤點」。</div>
+      <div id="count-list"></div>
+      <div style="margin-top:1rem;">
+        <button onclick="submitCount()" style="font-size:13px;padding:8px 20px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:var(--white);cursor:pointer;font-weight:500;">✅ 確認盤點並更新庫存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 新增品項 Modal -->
+<div class="modal-bg" id="modal-product"><div class="modal">
+  <div class="modal-title">🗃️ 新增成品品項</div>
+  <div class="form-row"><label class="form-label">品名／型號</label><input class="form-input" id="p-name" placeholder="例：TR35A" /></div>
+  <div class="form-row"><label class="form-label">客戶名稱</label><input class="form-input" id="p-client" placeholder="對應客戶（選填）" /></div>
+  <div class="form-row"><label class="form-label">存放位置</label><input class="form-input" id="p-location" placeholder="例：A區第3排" /></div>
+  <div class="form-row"><label class="form-label">初始庫存（pcs）</label><input class="form-input" id="p-init" type="number" min="0" placeholder="0" /></div>
+  <div class="form-row"><label class="form-label">低庫存警戒量（pcs）</label><input class="form-input" id="p-min" type="number" min="0" placeholder="低於此數量時警告" /></div>
+  <div class="form-row"><label class="form-label">單位重量（g，選填）</label><input class="form-input" id="p-weight" type="number" min="0" placeholder="0" /></div>
+  <div class="form-row"><label class="form-label">備註</label><input class="form-input" id="p-note" placeholder="備註說明" /></div>
+  <div class="modal-actions"><button class="btn-cancel" onclick="closeModal('product')">取消</button><button class="btn-save" onclick="saveProduct()">建立品項</button></div>
+</div></div>
+
+<!-- 入庫 Modal -->
+<div class="modal-bg" id="modal-inbound"><div class="modal">
+  <div class="modal-title">📥 入庫登記</div>
+  <input type="hidden" id="ib-product-docid" />
+  <div style="font-size:14px;font-weight:600;color:var(--brand);margin-bottom:1rem;" id="ib-product-name"></div>
+  <div class="form-row"><label class="form-label">入庫日期</label><input class="form-input" id="ib-date" type="date" /></div>
+  <div class="form-row"><label class="form-label">入庫數量（pcs）</label><input class="form-input" id="ib-qty" type="number" min="1" placeholder="0" /></div>
+  <div class="form-row"><label class="form-label">來源</label><select class="form-input" id="ib-source"><option value="生產完成">生產完成</option><option value="退貨入庫">退貨入庫</option><option value="調撥入庫">調撥入庫</option><option value="其他">其他</option></select></div>
+  <div class="form-row"><label class="form-label">相關訂單（選填）</label><input class="form-input" id="ib-order" placeholder="訂單編號" /></div>
+  <div class="form-row"><label class="form-label">操作員</label><input class="form-input" id="ib-operator" placeholder="操作員姓名" /></div>
+  <div class="form-row"><label class="form-label">備註</label><input class="form-input" id="ib-note" placeholder="備註" /></div>
+  <div class="modal-actions"><button class="btn-cancel" onclick="closeModal('inbound')">取消</button><button class="btn-save" onclick="saveInbound()">確認入庫</button></div>
+</div></div>
+
+<!-- 出庫 Modal -->
+<div class="modal-bg" id="modal-outbound"><div class="modal">
+  <div class="modal-title">📤 出庫登記</div>
+  <input type="hidden" id="ob-product-docid" />
+  <div style="font-size:14px;font-weight:600;color:var(--brand);margin-bottom:1rem;" id="ob-product-name"></div>
+  <div style="font-size:13px;color:var(--gray-600);margin-bottom:1rem;">目前庫存：<span id="ob-current-stock" style="font-weight:600;color:var(--brand);"></span> pcs</div>
+  <div class="form-row"><label class="form-label">出庫日期</label><input class="form-input" id="ob-date" type="date" /></div>
+  <div class="form-row"><label class="form-label">出庫數量（pcs）</label><input class="form-input" id="ob-qty" type="number" min="1" placeholder="0" /></div>
+  <div class="form-row"><label class="form-label">出庫原因</label><select class="form-input" id="ob-reason"><option value="客戶出貨">客戶出貨</option><option value="樣品">樣品</option><option value="報廢">報廢</option><option value="調撥出庫">調撥出庫</option><option value="其他">其他</option></select></div>
+  <div class="form-row"><label class="form-label">客戶名稱（選填）</label><input class="form-input" id="ob-client" placeholder="出貨對象" /></div>
+  <div class="form-row"><label class="form-label">相關訂單（選填）</label><input class="form-input" id="ob-order" placeholder="訂單編號" /></div>
+  <div class="form-row"><label class="form-label">操作員</label><input class="form-input" id="ob-operator" placeholder="操作員姓名" /></div>
+  <div class="form-row"><label class="form-label">備註</label><input class="form-input" id="ob-note" placeholder="備註" /></div>
+  <div class="modal-actions"><button class="btn-cancel" onclick="closeModal('outbound')">取消</button><button class="btn-save" onclick="saveOutbound()">確認出庫</button></div>
+</div></div>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyBFbGFazvMc-S6jN-vyuSt6I6ryvjDIRhE",authDomain:"hcpi-order-system.firebaseapp.com",projectId:"hcpi-order-system",storageBucket:"hcpi-order-system.firebasestorage.app",messagingSenderId:"950890521894",appId:"1:950890521894:web:5580143e80b484570e4de7"};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+
+let products=[],invLogs=[],invFilter='all',logFilter='all',expandedInv=null;
+let chartInvTop=null,chartInvTrend=null;
+
+// ── 載入資料 ──
+function loadData(){
+  db.collection('inventory').orderBy('createdAt','desc').onSnapshot(snap=>{
+    products=snap.docs.map(doc=>({docId:doc.id,...doc.data()}));
+    renderAll();
+  });
+  db.collection('inventoryLogs').orderBy('date','desc').limit(200).onSnapshot(snap=>{
+    invLogs=snap.docs.map(doc=>({docId:doc.id,...doc.data()}));
+    renderLogList();
+    renderCharts();
+  });
+}
+
+function renderAll(){renderStats();renderAlerts();renderProductList();renderCharts();renderCountList();}
+
+// ── 統計卡片 ──
+function renderStats(){
+  const total=products.length;
+  const totalStock=products.reduce((s,p)=>s+parseInt(p.stock||0),0);
+  const lowStock=products.filter(p=>p.minStock&&parseInt(p.stock||0)<=parseInt(p.minStock)&&parseInt(p.stock||0)>0).length;
+  const outStock=products.filter(p=>parseInt(p.stock||0)<=0).length;
+  document.getElementById('inv-stats').innerHTML=[
+    ['品項總數',total+' 種','var(--gray-800)'],
+    ['成品總庫存',totalStock.toLocaleString()+' pcs','var(--brand)'],
+    ['低庫存警告',lowStock+' 種',lowStock>0?'var(--warning)':'var(--gray-400)'],
+    ['缺貨品項',outStock+' 種',outStock>0?'var(--danger)':'var(--gray-400)'],
+  ].map(([l,n,c])=>`<div class="stat"><div class="stat-label">${l}</div><div class="stat-num" style="color:${c};font-size:20px;">${n}</div></div>`).join('');
+}
+
+// ── 低庫存警告 ──
+function renderAlerts(){
+  const alerts=products.filter(p=>p.minStock&&parseInt(p.stock||0)<=parseInt(p.minStock));
+  const el=document.getElementById('inv-alerts');
+  if(!alerts.length){el.innerHTML='';return;}
+  el.innerHTML=`<div style="font-size:14px;font-weight:600;color:var(--warning);margin-bottom:8px;">⚠️ 低庫存警告</div>`+alerts.map(p=>{
+    const stock=parseInt(p.stock||0),isOut=stock<=0;
+    return `<div class="alert-row">
+      <span style="font-size:20px;">${isOut?'🚨':'⚠️'}</span>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:600;color:${isOut?'var(--danger)':'var(--warning)'};">${p.name}</div><div style="font-size:12px;color:var(--gray-600);">${p.client||''} ${p.location?'・存放：'+p.location:''}</div></div>
+      <div style="text-align:right;"><div style="font-size:16px;font-weight:700;color:${isOut?'var(--danger)':'var(--warning)'};">${stock} pcs</div><div style="font-size:12px;color:var(--gray-600);">警戒：${p.minStock} pcs</div></div>
+      <button onclick="openInbound('${p.docId}')" style="font-size:12px;padding:5px 12px;border-radius:var(--radius-sm);border:none;background:var(--success);color:white;cursor:pointer;font-weight:500;">+ 入庫</button>
+    </div>`;
+  }).join('');
+}
+
+// ── 品項列表 ──
+function renderProductList(){
+  let list=products;
+  if(invFilter==='正常') list=products.filter(p=>!p.minStock||parseInt(p.stock||0)>parseInt(p.minStock));
+  else if(invFilter==='低庫存') list=products.filter(p=>p.minStock&&parseInt(p.stock||0)<=parseInt(p.minStock)&&parseInt(p.stock||0)>0);
+  else if(invFilter==='缺貨') list=products.filter(p=>parseInt(p.stock||0)<=0);
+  const container=document.getElementById('product-list');
+  if(!list.length){container.innerHTML='<div class="empty">沒有庫存品項</div>';return;}
+  container.innerHTML=list.map(p=>{
+    const stock=parseInt(p.stock||0),minStock=parseInt(p.minStock||0);
+    const status=stock<=0?'缺貨':minStock&&stock<=minStock?'低庫存':'正常';
+    const statusBadge=status==='缺貨'?'b-out':status==='低庫存'?'b-low':'b-ok';
+    const pct=minStock>0?Math.min(100,Math.round(stock/minStock*100)):100;
+    const progColor=stock<=0?'var(--danger)':minStock&&stock<=minStock?'var(--warning)':'var(--success)';
+    const isExp=expandedInv===p.docId;
+    const recentLogs=invLogs.filter(l=>l.productDocId===p.docId).slice(0,5);
+    return `<div class="inv-card ${isExp?'expanded':''}">
+      <div class="inv-top" onclick="toggleExpandInv('${p.docId}')">
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">${p.name}</div>
+          <div style="font-size:12px;color:var(--gray-400);margin-top:2px;">${p.client||''}${p.location?' ・ 📍'+p.location:''}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:20px;font-weight:700;color:${stock<=0?'var(--danger)':minStock&&stock<=minStock?'var(--warning)':'var(--brand)'};">${stock.toLocaleString()} pcs</div>
+          ${minStock?`<div style="font-size:11px;color:var(--gray-400);">警戒：${minStock} pcs</div>`:''}
+        </div>
+        <span class="badge ${statusBadge}">${status}</span>
+      </div>
+      ${minStock?`<div style="padding:0 1.25rem 8px;"><div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${progColor};"></div></div></div>`:''}
+      <div class="inv-detail ${isExp?'open':''}">
+        <div style="display:flex;gap:8px;margin-bottom:1rem;">
+          <button onclick="openInbound('${p.docId}')" style="font-size:12px;padding:6px 16px;border-radius:var(--radius-sm);border:none;background:var(--success);color:white;cursor:pointer;font-weight:500;">📥 入庫</button>
+          <button onclick="openOutbound('${p.docId}')" style="font-size:12px;padding:6px 16px;border-radius:var(--radius-sm);border:none;background:var(--danger);color:white;cursor:pointer;font-weight:500;">📤 出庫</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem;">
+          <div><div style="font-size:11px;color:var(--gray-400);">目前庫存</div><div style="font-size:16px;font-weight:700;color:var(--brand);">${stock} pcs</div></div>
+          <div><div style="font-size:11px;color:var(--gray-400);">低庫存警戒</div><div style="font-size:13px;">${minStock||'-'} pcs</div></div>
+          <div><div style="font-size:11px;color:var(--gray-400);">存放位置</div><div style="font-size:13px;">${p.location||'-'}</div></div>
+          ${p.weight?`<div><div style="font-size:11px;color:var(--gray-400);">單位重量</div><div style="font-size:13px;">${p.weight} g</div></div>`:''}
+          ${p.note?`<div style="grid-column:span 3;"><div style="font-size:11px;color:var(--gray-400);">備註</div><div style="font-size:13px;">${p.note}</div></div>`:''}
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:500;margin-bottom:8px;">📋 最近出入庫記錄</div>
+          ${recentLogs.length?recentLogs.map(l=>`<div class="log-item"><span class="log-date">${l.date}</span><span class="${l.type==='入庫'?'log-in':'log-out'}">${l.type==='入庫'?'+':'-'}${parseInt(l.qty||0)} pcs</span><span style="font-size:12px;background:var(--gray-100);padding:1px 8px;border-radius:99px;">${l.type}</span><span style="font-size:12px;color:var(--gray-600);">${l.reason||l.source||''}</span><span style="font-size:12px;color:var(--gray-400);">${l.operator||''}</span></div>`).join(''):'<div style="font-size:12px;color:var(--gray-400);">尚無記錄</div>'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── 出入庫記錄 ──
+function renderLogList(){
+  const list=logFilter==='all'?invLogs:invLogs.filter(l=>l.type===logFilter);
+  const container=document.getElementById('log-list');
+  if(!list.length){container.innerHTML='<div class="empty">沒有出入庫記錄</div>';return;}
+  container.innerHTML=`<div style="background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);overflow:hidden;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:var(--gray-50);border-bottom:1px solid var(--gray-200);">
+        <th style="padding:10px 14px;text-align:left;font-weight:500;color:var(--gray-600);">日期</th>
+        <th style="padding:10px 14px;text-align:left;font-weight:500;color:var(--gray-600);">品名</th>
+        <th style="padding:10px 14px;text-align:left;font-weight:500;color:var(--gray-600);">類型</th>
+        <th style="padding:10px 14px;text-align:right;font-weight:500;color:var(--gray-600);">數量</th>
+        <th style="padding:10px 14px;text-align:right;font-weight:500;color:var(--gray-600);">庫存後</th>
+        <th style="padding:10px 14px;text-align:left;font-weight:500;color:var(--gray-600);">原因</th>
+        <th style="padding:10px 14px;text-align:left;font-weight:500;color:var(--gray-600);">操作員</th>
+        <th style="padding:10px 14px;text-align:left;font-weight:500;color:var(--gray-600);">備註</th>
+      </tr></thead>
+      <tbody>${list.map(l=>`<tr style="border-bottom:1px solid var(--gray-100);">
+        <td style="padding:9px 14px;">${l.date||'-'}</td>
+        <td style="padding:9px 14px;font-weight:500;">${l.productName||'-'}</td>
+        <td style="padding:9px 14px;"><span class="badge ${l.type==='入庫'?'b-ok':l.type==='出庫'?'b-out':'b-low'}">${l.type||'-'}</span></td>
+        <td style="padding:9px 14px;text-align:right;font-weight:600;color:${l.type==='入庫'?'var(--success)':'var(--danger)'};">${l.type==='入庫'?'+':'-'}${parseInt(l.qty||0)} pcs</td>
+        <td style="padding:9px 14px;text-align:right;font-weight:600;color:var(--brand);">${parseInt(l.stockAfter||0)} pcs</td>
+        <td style="padding:9px 14px;color:var(--gray-600);">${l.reason||l.source||'-'}</td>
+        <td style="padding:9px 14px;">${l.operator||'-'}</td>
+        <td style="padding:9px 14px;font-size:12px;color:var(--gray-400);">${l.note||'-'}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── 盤點 ──
+function renderCountList(){
+  const container=document.getElementById('count-list');
+  if(!products.length){container.innerHTML='<div class="empty">沒有品項可以盤點</div>';return;}
+  container.innerHTML=products.map(p=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--gray-100);">
+    <div style="flex:1;"><div style="font-size:13px;font-weight:600;">${p.name}</div><div style="font-size:12px;color:var(--gray-400);">${p.client||''} ${p.location?'・'+p.location:''}</div></div>
+    <div style="font-size:13px;color:var(--gray-600);">帳面：<strong style="color:var(--brand);">${parseInt(p.stock||0)} pcs</strong></div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="font-size:13px;color:var(--gray-600);">實際：</span>
+      <input type="number" id="count-${p.docId}" min="0" placeholder="${parseInt(p.stock||0)}" style="width:80px;font-size:13px;padding:5px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:var(--white);text-align:center;" />
+      <span style="font-size:13px;color:var(--gray-400);">pcs</span>
+    </div>
+  </div>`).join('');
+}
+
+async function submitCount(){
+  const today=new Date().toISOString().split('T')[0];
+  let updated=0;
+  for(const p of products){
+    const input=document.getElementById('count-'+p.docId);
+    if(!input||input.value==='')continue;
+    const actual=parseInt(input.value)||0;
+    const current=parseInt(p.stock||0);
+    if(actual===current)continue;
+    const diff=actual-current;
+    const type=diff>0?'入庫':'出庫';
+    await db.collection('inventory').doc(p.docId).update({stock:actual});
+    await db.collection('inventoryLogs').add({productDocId:p.docId,productName:p.name,date:today,type:'調整',qty:Math.abs(diff),stockAfter:actual,reason:'庫存盤點',note:`盤點調整：帳面${current}→實際${actual}`,operator:'盤點作業',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    updated++;
+  }
+  alert(`盤點完成！共更新 ${updated} 個品項。`);
+  renderAll();
+}
+
+// ── 圖表 ──
+function renderCharts(){
+  // 庫存量 Top 10
+  const top=products.sort((a,b)=>parseInt(b.stock||0)-parseInt(a.stock||0)).slice(0,10);
+  if(chartInvTop)chartInvTop.destroy();
+  chartInvTop=new Chart(document.getElementById('chart-inv-top'),{type:'bar',data:{labels:top.map(p=>p.name),datasets:[{label:'庫存量',data:top.map(p=>parseInt(p.stock||0)),backgroundColor:top.map(p=>{const s=parseInt(p.stock||0),m=parseInt(p.minStock||0);return s<=0?'#E74C3C':m&&s<=m?'#E67E22':'#5B21F4';}),borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+
+  // 近30天出入庫趨勢
+  const now=new Date();
+  const days=Array.from({length:30},(_,i)=>{const d=new Date(now.getTime()-(29-i)*86400000);return d.toISOString().split('T')[0];});
+  const inData=days.map(d=>invLogs.filter(l=>l.date===d&&l.type==='入庫').reduce((s,l)=>s+parseInt(l.qty||0),0));
+  const outData=days.map(d=>invLogs.filter(l=>l.date===d&&l.type==='出庫').reduce((s,l)=>s+parseInt(l.qty||0),0));
+  if(chartInvTrend)chartInvTrend.destroy();
+  chartInvTrend=new Chart(document.getElementById('chart-inv-trend'),{type:'line',data:{labels:days.map(d=>d.slice(5)),datasets:[{label:'入庫',data:inData,borderColor:'#27AE60',backgroundColor:'rgba(39,174,96,0.1)',fill:true,tension:0.4,pointRadius:2},{label:'出庫',data:outData,borderColor:'#E74C3C',backgroundColor:'rgba(231,76,60,0.1)',fill:true,tension:0.4,pointRadius:2}]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true},x:{ticks:{maxTicksLimit:10}}}}});
+}
+
+// ── 匯出 ──
+function exportInv(){
+  const header=['品名','客戶','存放位置','目前庫存(pcs)','低庫存警戒(pcs)','狀態','備註'];
+  const rows=products.map(p=>{const s=parseInt(p.stock||0),m=parseInt(p.minStock||0);const status=s<=0?'缺貨':m&&s<=m?'低庫存':'正常';return [p.name||'',p.client||'',p.location||'',s,m||'-',status,p.note||''];});
+  const csvContent=[header,...rows].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csvContent],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`HCPI庫存報表_${new Date().toISOString().split('T')[0]}.csv`;a.click();
+}
+
+// ── Tab ──
+function switchInvTab(tab){
+  ['products','logs','count'].forEach(t=>{document.getElementById('inv-'+t+'-section').style.display=t===tab?'block':'none';document.getElementById('tab-'+t).classList.toggle('active',t===tab);});
+  const btn=document.getElementById('inv-add-btn');
+  if(tab==='products'){btn.style.display='';btn.textContent='+ 新增品項';btn.onclick=()=>openModal('product');}
+  else if(tab==='logs'){btn.style.display='';btn.textContent='+ 手動記錄';btn.onclick=()=>alert('請從品項頁面操作入庫／出庫');}
+  else btn.style.display='none';
+  if(tab==='count')renderCountList();
+}
+
+function setInvFilter(f,btn){invFilter=f;document.querySelectorAll('#inv-products-section .chip').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderProductList();}
+function setLogFilter(f,btn){logFilter=f;document.querySelectorAll('#inv-logs-section .chip').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderLogList();}
+function toggleExpandInv(docId){expandedInv=expandedInv===docId?null:docId;renderProductList();}
+
+// ── Modal ──
+function openModal(type){document.getElementById('modal-'+type).classList.add('open');}
+function closeModal(type){document.getElementById('modal-'+type).classList.remove('open');}
+
+function openInbound(docId){
+  const p=products.find(p=>p.docId===docId);if(!p)return;
+  document.getElementById('ib-product-docid').value=docId;
+  document.getElementById('ib-product-name').textContent=p.name;
+  document.getElementById('ib-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('ib-qty').value='';document.getElementById('ib-order').value='';document.getElementById('ib-note').value='';
+  document.getElementById('modal-inbound').classList.add('open');
+}
+function openOutbound(docId){
+  const p=products.find(p=>p.docId===docId);if(!p)return;
+  document.getElementById('ob-product-docid').value=docId;
+  document.getElementById('ob-product-name').textContent=p.name;
+  document.getElementById('ob-current-stock').textContent=parseInt(p.stock||0).toLocaleString();
+  document.getElementById('ob-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('ob-qty').value='';document.getElementById('ob-client').value='';document.getElementById('ob-order').value='';document.getElementById('ob-note').value='';
+  document.getElementById('modal-outbound').classList.add('open');
+}
+
+// ── 儲存 ──
+function saveProduct(){
+  const name=document.getElementById('p-name').value.trim();if(!name){alert('請填寫品名');return;}
+  const initStock=parseInt(document.getElementById('p-init').value)||0;
+  db.collection('inventory').add({name,client:document.getElementById('p-client').value,location:document.getElementById('p-location').value,stock:initStock,minStock:parseInt(document.getElementById('p-min').value)||0,weight:parseFloat(document.getElementById('p-weight').value)||0,note:document.getElementById('p-note').value,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  closeModal('product');['p-name','p-client','p-location','p-init','p-min','p-weight','p-note'].forEach(f=>document.getElementById(f).value='');
+}
+
+async function saveInbound(){
+  const docId=document.getElementById('ib-product-docid').value,date=document.getElementById('ib-date').value,qty=parseInt(document.getElementById('ib-qty').value)||0;
+  if(!date||qty<=0){alert('請填寫日期和入庫數量');return;}
+  const p=products.find(p=>p.docId===docId);if(!p)return;
+  const newStock=parseInt(p.stock||0)+qty;
+  await db.collection('inventory').doc(docId).update({stock:newStock});
+  await db.collection('inventoryLogs').add({productDocId:docId,productName:p.name,date,type:'入庫',qty,stockAfter:newStock,source:document.getElementById('ib-source').value,order:document.getElementById('ib-order').value,operator:document.getElementById('ib-operator').value,note:document.getElementById('ib-note').value,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  closeModal('inbound');expandedInv=docId;
+}
+
+async function saveOutbound(){
+  const docId=document.getElementById('ob-product-docid').value,date=document.getElementById('ob-date').value,qty=parseInt(document.getElementById('ob-qty').value)||0;
+  if(!date||qty<=0){alert('請填寫日期和出庫數量');return;}
+  const p=products.find(p=>p.docId===docId);if(!p)return;
+  const currentStock=parseInt(p.stock||0);
+  if(qty>currentStock){alert(`出庫數量（${qty}）超過目前庫存（${currentStock}）！`);return;}
+  const newStock=currentStock-qty;
+  await db.collection('inventory').doc(docId).update({stock:newStock});
+  await db.collection('inventoryLogs').add({productDocId:docId,productName:p.name,date,type:'出庫',qty,stockAfter:newStock,reason:document.getElementById('ob-reason').value,client:document.getElementById('ob-client').value,order:document.getElementById('ob-order').value,operator:document.getElementById('ob-operator').value,note:document.getElementById('ob-note').value,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  closeModal('outbound');expandedInv=docId;
+}
+
+// ── 啟動 ──
+window.addEventListener('load',loadData);
+</script>
+</body>
+</html>
