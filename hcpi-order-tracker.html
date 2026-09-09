@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://apis.google.com/js/api.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
@@ -401,6 +402,11 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--bg-dark);color:var(-
       <div style="font-size:16px;font-weight:600;">機台 QR Code</div>
       <button onclick="window.print()" style="font-size:13px;padding:7px 16px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:var(--white);cursor:pointer;font-weight:500;margin-left:auto;">列印全部</button>
     </div>
+    <div style="display:flex;gap:8px;margin-bottom:1rem;">
+      <button class="chip active" id="qr-type-report" onclick="setQrType('report',this)">生產填報 QR</button>
+      <button class="chip" id="qr-type-inspection" onclick="setQrType('inspection',this)">製程巡檢 QR</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:1rem;" id="qr-type-hint">操作員掃描後進入生產填報頁(operator-report.html)</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;" id="qr-grid"></div>
   </div>
 
@@ -495,6 +501,25 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--bg-dark);color:var(-
     <div class="fishbone-wrap" id="fishbone-section">
       <div style="font-size:14px;font-weight:600;margin-bottom:1rem;">🐟 不良原因魚骨圖分析</div>
       <svg id="fishbone-svg" width="100%" height="320" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <!-- 製程巡檢(手機 inspection.html 填寫) -->
+    <div class="dash-card" style="margin-bottom:1.25rem;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:.75rem;flex-wrap:wrap;">
+        <div style="font-size:14px;font-weight:600;">📏 製程巡檢紀錄</div>
+        <div id="insp-stats" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="insp-range">
+          <button class="chip" onclick="setInspRange('1',this)">今天</button>
+          <button class="chip active" onclick="setInspRange('7',this)">近7天</button>
+          <button class="chip" onclick="setInspRange('30',this)">近30天</button>
+          <button class="chip" onclick="setInspRange('all',this)">全部</button>
+          <input type="date" id="insp-date" class="form-input" style="width:auto;padding:5px 8px;font-size:12px;" onchange="setInspDate(this.value)" />
+        </div>
+      </div>
+      <div id="insp-list"></div>
+      <details style="margin-top:1rem;">
+        <summary style="font-size:13px;font-weight:600;cursor:pointer;color:var(--text-secondary);">檢驗項目規格(依件號 + 工段)</summary>
+        <div id="insp-spec-list" style="margin-top:.5rem;"></div>
+      </details>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem;flex-wrap:wrap;">
       <div style="font-size:14px;font-weight:600;">📋 不良品記錄</div>
@@ -776,6 +801,11 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--bg-dark);color:var(-
 </div></div>
 
 <!-- 不良品 Modal -->
+<div class="modal-bg" id="modal-inspection"><div class="modal" style="width:min(900px,100%);">
+  <div class="modal-title" id="insp-modal-title">📏 巡檢紀錄</div>
+  <div id="insp-modal-body"></div>
+  <div class="modal-actions"><button class="btn-cancel" onclick="closeModal('inspection')" style="font-size:13px;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;">關閉</button><button id="insp-modal-export" style="font-size:13px;padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--success);color:var(--white);cursor:pointer;font-weight:500;">匯出製程自主檢驗表 Excel</button></div>
+</div></div>
 <div class="modal-bg" id="modal-defect"><div class="modal">
   <div class="modal-title" id="defect-modal-title">🔍 新增不良品記錄</div>
   <input type="hidden" id="d-docid" />
@@ -1040,7 +1070,8 @@ function calcInvTotal(){const qty=parseFloat(document.getElementById('inv-qty').
 
 // ── QR ──
 const ALL_MACHINES=[...Array.from({length:22},(_,i)=>({factory:'一廠',machine:`CNC車${i+1}`})),...Array.from({length:14},(_,i)=>({factory:'二廠',machine:`CNC銑${i+1}`})),...Array.from({length:16},(_,i)=>({factory:'二廠',machine:`CNC車${i+1}`}))];
-function renderQR(){const grid=document.getElementById('qr-grid');const baseUrl=window.location.origin+'/operator-report.html';grid.innerHTML=ALL_MACHINES.map(({factory,machine})=>{const url=`${baseUrl}?factory=${encodeURIComponent(factory)}&machine=${encodeURIComponent(machine)}`;const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(url)}`;return `<div class="qr-card"><div class="qr-factory">${factory}</div><div class="qr-machine">${machine}</div><img class="qr-img" src="${qrUrl}" loading="lazy" /><div class="qr-url">${machine}</div></div>`;}).join('');}
+let qrType='report';function setQrType(t,btn){qrType=t;document.querySelectorAll('#page-qr .chip').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.getElementById('qr-type-hint').textContent=t==='inspection'?'量測人員掃描後進入製程巡檢頁(inspection.html),可拍規格卡辨識、輸入各時段實測值':'操作員掃描後進入生產填報頁(operator-report.html)';renderQR();}
+function renderQR(){const grid=document.getElementById('qr-grid');const baseUrl=window.location.origin+(qrType==='inspection'?'/inspection.html':'/operator-report.html');grid.innerHTML=ALL_MACHINES.map(({factory,machine})=>{const url=`${baseUrl}?factory=${encodeURIComponent(factory)}&machine=${encodeURIComponent(machine)}`;const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(url)}`;return `<div class="qr-card"><div class="qr-factory">${factory}</div><div class="qr-machine">${machine}</div><img class="qr-img" src="${qrUrl}" loading="lazy" /><div class="qr-url">${qrType==='inspection'?'巡檢 ・ ':''}${machine}</div></div>`;}).join('');}
 
 // ── 日報表 ──
 function goToday(){document.getElementById('report-date').value=new Date().toISOString().split('T')[0];renderReport();}
@@ -1141,7 +1172,7 @@ function confirmReceive(){const docId=document.getElementById('receive-po-docid'
 function updatePoStatus(docId,status){db.collection('purchaseOrders').doc(docId).update({status});expandedPo=docId;}
 
 // ── 品質 ──
-function renderQualityPage(){renderQcStats();renderDefectCharts();renderFishbone();renderDefectList();}
+function renderQualityPage(){renderQcStats();renderDefectCharts();renderFishbone();renderDefectList();renderInspectionList();renderSpecList();}
 function renderQcStats(){const totalDefects=defects.reduce((s,d)=>s+parseInt(d.qty||0),0),thisMonth=new Date().toISOString().slice(0,7),monthDefects=defects.filter(d=>d.date&&d.date.slice(0,7)===thisMonth).reduce((s,d)=>s+parseInt(d.qty||0),0),totalShipped=orders.reduce((s,o)=>{const logs=Array.isArray(o.shipLogs)?o.shipLogs:[];return s+logs.reduce((ss,l)=>ss+parseInt(l.qty||0),0);},0),totalDefectFromOrders=orders.reduce((s,o)=>{const logs=Array.isArray(o.shipLogs)?o.shipLogs:[];return s+logs.reduce((ss,l)=>ss+parseInt(l.defect||0),0);},0),defectRate=totalShipped>0?((totalDefectFromOrders/totalShipped)*100).toFixed(2):0,pending=defects.filter(d=>d.action==='待處理').length;document.getElementById('qc-stats').innerHTML=[['累計不良數量',totalDefects+' pcs','var(--danger)'],['本月不良數量',monthDefects+' pcs','var(--warning)'],['整體不良率',defectRate+'%',parseFloat(defectRate)>3?'var(--danger)':parseFloat(defectRate)>1?'var(--warning)':'var(--success)'],['待處理記錄',pending+' 筆',pending>0?'var(--warning)':'var(--gray-400)']].map(([l,n,c])=>`<div class="stat"><div class="stat-label">${l}</div><div class="stat-num" style="color:${c};font-size:20px;">${n}</div></div>`).join('');}
 function renderDefectCharts(){const reasonCounts=DEFECT_CATEGORIES.map(c=>defects.filter(d=>d.category===c).reduce((s,d)=>s+parseInt(d.qty||0),0));if(chartDefectReason)chartDefectReason.destroy();chartDefectReason=new Chart(document.getElementById('chart-defect-reason'),{type:'doughnut',data:{labels:DEFECT_CATEGORIES,datasets:[{data:reasonCounts,backgroundColor:Object.values(DEFECT_COLORS),borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,plugins:{legend:{position:'bottom'}}}});const now=new Date(),days30=Array.from({length:30},(_,i)=>{const d=new Date(now.getTime()-(29-i)*86400000);return d.toISOString().split('T')[0];});const trend30=days30.map(d=>defects.filter(r=>r.date===d).reduce((s,r)=>s+parseInt(r.qty||0),0));if(chartDefectTrend)chartDefectTrend.destroy();chartDefectTrend=new Chart(document.getElementById('chart-defect-trend'),{type:'line',data:{labels:days30.map(d=>d.slice(5)),datasets:[{label:'不良數量',data:trend30,borderColor:'#E74C3C',backgroundColor:'rgba(231,76,60,0.1)',fill:true,tension:0.4,pointRadius:2}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true},x:{ticks:{maxTicksLimit:10}}}}});const factories=['一廠','二廠','委外加工'],factoryDefects=factories.map(f=>defects.filter(d=>d.factory===f).reduce((s,d)=>s+parseInt(d.qty||0),0));if(chartDefectFactory)chartDefectFactory.destroy();chartDefectFactory=new Chart(document.getElementById('chart-defect-factory'),{type:'bar',data:{labels:factories,datasets:[{label:'不良數量',data:factoryDefects,backgroundColor:['#5B21F4','#1D4ED8','#B45309'],borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});const machineMap={};defects.forEach(d=>{const m=d.machine||'未知';if(!machineMap[m])machineMap[m]=0;machineMap[m]+=parseInt(d.qty||0);});const topMachines=Object.entries(machineMap).sort((a,b)=>b[1]-a[1]).slice(0,10);if(chartDefectMachine)chartDefectMachine.destroy();chartDefectMachine=new Chart(document.getElementById('chart-defect-machine'),{type:'bar',data:{labels:topMachines.map(m=>m[0]),datasets:[{label:'不良數量',data:topMachines.map(m=>m[1]),backgroundColor:'#E74C3C',borderRadius:6}]},options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}});}
 function renderFishbone(){const svg=document.getElementById('fishbone-svg');const categoryCounts={};DEFECT_CATEGORIES.forEach(c=>{categoryCounts[c]=defects.filter(d=>d.category===c).reduce((s,d)=>s+parseInt(d.qty||0),0);});const total=Object.values(categoryCounts).reduce((s,v)=>s+v,0)||1;const cx=680,cy=160;const topCats=['尺寸不良','材料問題','機器問題'],botCats=['外觀瑕疵','加工錯誤','其他'];let html=`<ellipse cx="${cx+40}" cy="${cy}" rx="50" ry="30" fill="#E74C3C" opacity="0.9"/><text x="${cx+40}" y="${cy+5}" text-anchor="middle" fill="white" font-size="13" font-weight="bold">不良品</text><line x1="${cx-560}" y1="${cy}" x2="${cx}" y2="${cy}" stroke="#555" stroke-width="3"/><polygon points="${cx-560},${cy} ${cx-580},${cy-20} ${cx-580},${cy+20}" fill="#555"/>`;topCats.forEach((cat,i)=>{const x=cx-560+100+i*170,pct=Math.round(categoryCounts[cat]/total*100),color=DEFECT_COLORS[cat];html+=`<line x1="${x}" y1="${cy}" x2="${x-40}" y2="${cy-70}" stroke="${color}" stroke-width="2"/><rect x="${x-100}" y="${cy-90}" width="120" height="32" rx="6" fill="${color}" opacity="0.15" stroke="${color}" stroke-width="1"/><text x="${x-40}" y="${cy-78}" text-anchor="middle" fill="${color}" font-size="12" font-weight="600">${cat}</text><text x="${x-40}" y="${cy-63}" text-anchor="middle" fill="${color}" font-size="11">${categoryCounts[cat]} (${pct}%)</text>`;});botCats.forEach((cat,i)=>{const x=cx-560+100+i*170,pct=Math.round(categoryCounts[cat]/total*100),color=DEFECT_COLORS[cat];html+=`<line x1="${x}" y1="${cy}" x2="${x-40}" y2="${cy+70}" stroke="${color}" stroke-width="2"/><rect x="${x-100}" y="${cy+68}" width="120" height="32" rx="6" fill="${color}" opacity="0.15" stroke="${color}" stroke-width="1"/><text x="${x-40}" y="${cy+82}" text-anchor="middle" fill="${color}" font-size="12" font-weight="600">${cat}</text><text x="${x-40}" y="${cy+96}" text-anchor="middle" fill="${color}" font-size="11">${categoryCounts[cat]} (${pct}%)</text>`;});svg.innerHTML=html;}
@@ -1367,6 +1398,138 @@ function savePurchaseOrder(){const poId=document.getElementById('po-id').value.t
 function editVendor(docId){const v=vendors.find(v=>v.docId===docId);if(!v)return;document.getElementById('v-modal-title').textContent='編輯廠商';document.getElementById('v-docid').value=docId;document.getElementById('v-name').value=v.name||'';document.getElementById('v-contact').value=v.contact||'';document.getElementById('v-phone').value=v.phone||'';document.getElementById('v-email').value=v.email||'';document.getElementById('v-items').value=v.items||'';document.getElementById('v-payment').value=v.payment||'月結30天';document.getElementById('v-note').value=v.note||'';document.getElementById('modal-vendor').classList.add('open');}
 function deleteVendor(docId){if(!confirm('確定要刪除這個廠商嗎？'))return;db.collection('vendors').doc(docId).delete().then(()=>alert('廠商已刪除！')).catch(e=>alert('刪除失敗：'+e.message));}
 function saveVendor(){const name=document.getElementById('v-name').value.trim();if(!name){alert('請填寫廠商名稱');return;}const docId=document.getElementById('v-docid').value;const data={name,contact:document.getElementById('v-contact').value,phone:document.getElementById('v-phone').value,email:document.getElementById('v-email').value,items:document.getElementById('v-items').value,payment:document.getElementById('v-payment').value,note:document.getElementById('v-note').value};if(docId){db.collection('vendors').doc(docId).update(data);}else{data.createdAt=firebase.firestore.FieldValue.serverTimestamp();db.collection('vendors').add(data);}closeModal('vendor');['v-docid','v-name','v-contact','v-phone','v-email','v-items','v-note'].forEach(f=>document.getElementById(f).value='');document.getElementById('v-modal-title').textContent='新增廠商';}
+
+// ══════════════════════════════════════════════════════════
+// ── 製程巡檢(手機 inspection.html 寫入 inspections / inspectionSpecs)──
+// ══════════════════════════════════════════════════════════
+let inspections=[],inspectionSpecs=[],inspFilterDate='',inspFilterRange='7';
+const INSP_SLOTS=[['first','首件'],['10:30','10:30'],['13:30','13:30'],['15:30','15:30'],['17:30','17:30'],['19:30','19:30'],['21:30','21:30'],['23:30','23:30'],['extra','其他']];
+const INSP_TOOLS=[['A','游標卡尺'],['B','分厘卡(卡規)'],['C','缸徑規'],['D','高(深)度規'],['E','塞規'],['F','R規'],['G','牙規'],['H','三次元測量儀'],['I','投影機'],['J','表面粗度儀'],['K','檢具'],['L','目視']];
+function loadInspections(){
+  db.collection('inspections').orderBy('date','desc').limit(500).onSnapshot(s=>{inspections=s.docs.map(d=>({docId:d.id,...d.data()}));if(document.getElementById('page-quality').style.display!=='none')renderInspectionList();});
+  db.collection('inspectionSpecs').orderBy('updatedAt','desc').onSnapshot(s=>{inspectionSpecs=s.docs.map(d=>({docId:d.id,...d.data()}));if(document.getElementById('page-quality').style.display!=='none')renderSpecList();});
+}
+function setInspRange(r,btn){inspFilterRange=r;inspFilterDate='';document.getElementById('insp-date').value='';document.querySelectorAll('#insp-range .chip').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');renderInspectionList();}
+function setInspDate(v){inspFilterDate=v;document.querySelectorAll('#insp-range .chip').forEach(b=>b.classList.remove('active'));renderInspectionList();}
+function inspFiltered(){
+  if(inspFilterDate)return inspections.filter(i=>i.date===inspFilterDate);
+  if(inspFilterRange==='all')return inspections;
+  const from=new Date();from.setDate(from.getDate()-parseInt(inspFilterRange)+1);const f=from.toISOString().split('T')[0];
+  return inspections.filter(i=>i.date>=f);
+}
+function inspSlotSummary(i){const s=i.slots||{};const used=INSP_SLOTS.filter(k=>s[k[0]]);return {count:used.length,labels:used.map(k=>k[1]),ng:used.reduce((n,k)=>n+(s[k[0]].ng||0),0)};}
+function renderInspectionList(){
+  const el=document.getElementById('insp-list');if(!el)return;
+  const list=inspFiltered();
+  const today=new Date().toISOString().split('T')[0];
+  const todayCnt=inspections.filter(i=>i.date===today).length,ngCnt=list.reduce((n,i)=>n+inspSlotSummary(i).ng,0);
+  document.getElementById('insp-stats').innerHTML=`<span class="badge b-mat">今日 ${todayCnt} 張</span> <span class="badge ${ngCnt?'b-wait':'b-done'}" style="${ngCnt?'background:var(--danger-bg);color:var(--danger);':''}">NG ${ngCnt} 項</span> <span class="badge b-wait">規格 ${inspectionSpecs.length} 件</span>`;
+  if(!list.length){el.innerHTML='<div class="empty">這段期間沒有巡檢紀錄。現場人員掃機台上的「巡檢」QR Code 即可填寫。</div>';return;}
+  el.innerHTML=`<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap;">
+    <tr style="color:var(--text-muted);font-size:12px;text-align:left;"><th style="padding:6px 8px;">日期</th><th style="padding:6px 8px;">廠別/機台</th><th style="padding:6px 8px;">品名/件號</th><th style="padding:6px 8px;">工段</th><th style="padding:6px 8px;">訂單</th><th style="padding:6px 8px;">已填時段</th><th style="padding:6px 8px;">NG</th><th style="padding:6px 8px;">檢驗員</th><th style="padding:6px 8px;"></th></tr>
+    ${list.map(i=>{const s=inspSlotSummary(i);return `<tr style="border-top:1px solid var(--border);">
+      <td style="padding:8px;">${i.date||''}</td><td style="padding:8px;">${i.factory||''} ${i.machine||''}</td><td style="padding:8px;font-weight:600;">${i.partNo||''}</td><td style="padding:8px;">${i.sectionLabel||i.section||''}</td><td style="padding:8px;color:var(--text-secondary);">${i.orderId||'-'}</td>
+      <td style="padding:8px;">${s.count}/9 <span style="color:var(--text-muted);font-size:11px;">${s.labels.join('、')}</span></td>
+      <td style="padding:8px;">${s.ng?`<span class="badge" style="background:var(--danger-bg);color:var(--danger);">${s.ng}</span>`:'<span style="color:var(--success);">0</span>'}</td>
+      <td style="padding:8px;">${i.lastInspector||''}</td>
+      <td style="padding:8px;text-align:right;"><button class="chip" onclick="viewInspection('${i.docId}')">檢視</button> <button class="chip" onclick="exportInspectionXlsx('${i.docId}')">匯出 Excel</button>${isAdminUser?` <button class="chip" style="color:var(--danger);" onclick="deleteInspection('${i.docId}')">刪除</button>`:''}</td></tr>`;}).join('')}
+  </table></div>`;
+}
+function renderSpecList(){
+  const el=document.getElementById('insp-spec-list');if(!el)return;
+  if(!inspectionSpecs.length){el.innerHTML='<div style="font-size:13px;color:var(--text-muted);padding:.5rem 0;">尚無檢驗項目規格。現場第一次拍規格卡辨識後會自動建立。</div>';return;}
+  el.innerHTML=`<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap;">
+    <tr style="color:var(--text-muted);font-size:12px;text-align:left;"><th style="padding:6px 8px;">品名/件號</th><th style="padding:6px 8px;">工段</th><th style="padding:6px 8px;">檢驗項目</th><th style="padding:6px 8px;">更新者</th><th></th></tr>
+    ${inspectionSpecs.map(s=>`<tr style="border-top:1px solid var(--border);"><td style="padding:8px;font-weight:600;">${s.partNo||''}</td><td style="padding:8px;">${({CT1:'車1',CT2:'車2',CT3:'車3',CT4:'車4',CT5:'車5',CTF:'車完工',CM1:'銑1',CM2:'銑2',CM3:'銑3',CM4:'銑4',CM5:'銑5',CMF:'銑完工'})[s.section]||s.section||''}</td><td style="padding:8px;white-space:normal;color:var(--text-secondary);">${(s.items||[]).map(it=>`${it.name} ${it.stdText||''}`).join('、')}</td><td style="padding:8px;">${s.updatedBy||''}</td><td style="padding:8px;text-align:right;">${isAdminUser?`<button class="chip" style="color:var(--danger);" onclick="deleteSpec('${s.docId}')">刪除</button>`:''}</td></tr>`).join('')}
+  </table></div>`;
+}
+function deleteInspection(docId){if(!confirm('確定刪除這張巡檢紀錄?'))return;db.collection('inspections').doc(docId).delete();}
+function deleteSpec(docId){if(!confirm('確定刪除這組檢驗項目規格?(已產生的巡檢紀錄不受影響,現場下次要重新拍卡)'))return;db.collection('inspectionSpecs').doc(docId).delete();}
+function viewInspection(docId){
+  const i=inspections.find(x=>x.docId===docId);if(!i)return;
+  const s=i.slots||{},used=INSP_SLOTS.filter(k=>s[k[0]]),items=i.items||[];
+  document.getElementById('insp-modal-title').textContent=`📏 ${i.partNo||''} ・ ${i.sectionLabel||i.section||''} ・ ${i.date||''}`;
+  document.getElementById('insp-modal-body').innerHTML=`<div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">${i.factory||''} ${i.machine||''}${i.orderId?' ・ 訂單 '+i.orderId:''}${i.client?' ・ '+i.client:''}</div>
+  <div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:12px;white-space:nowrap;">
+   <tr><th style="border:1px solid var(--border);padding:5px 8px;background:var(--bg-input);">項目</th><th style="border:1px solid var(--border);padding:5px 8px;background:var(--bg-input);">標準</th><th style="border:1px solid var(--border);padding:5px 8px;background:var(--bg-input);">量具</th>${used.map(k=>`<th style="border:1px solid var(--border);padding:5px 8px;background:var(--bg-input);">${k[1]}</th>`).join('')}</tr>
+   ${items.map(it=>`<tr><td style="border:1px solid var(--border);padding:5px 8px;font-weight:600;">${it.no}. ${it.name}</td><td style="border:1px solid var(--border);padding:5px 8px;">${it.stdText||''}</td><td style="border:1px solid var(--border);padding:5px 8px;text-align:center;">${it.tool||''}</td>${used.map(k=>{const d=s[k[0]],v=d.values?d.values[it.no]:'',j=d.judges?d.judges[it.no]:'';return `<td style="border:1px solid var(--border);padding:5px 8px;text-align:center;${j==='NG'?'background:var(--danger-bg);color:var(--danger);font-weight:700;':j==='OK'?'color:var(--success);':''}">${v==null?'':v}</td>`;}).join('')}</tr>`).join('')}
+   <tr><td style="border:1px solid var(--border);padding:5px 8px;" colspan="3">檢驗人員 / 時間</td>${used.map(k=>`<td style="border:1px solid var(--border);padding:5px 8px;text-align:center;font-size:11px;">${s[k[0]].inspector||''}<br>${s[k[0]].time||''}</td>`).join('')}</tr>
+  </table></div>
+  ${used.some(k=>s[k[0]].remark)?`<div style="font-size:12px;color:var(--text-secondary);margin-top:8px;">${used.filter(k=>s[k[0]].remark).map(k=>`${k[1]}:${s[k[0]].remark}`).join(' ・ ')}</div>`:''}
+  ${i.specNotes?`<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">備註:${i.specNotes}</div>`:''}`;
+  document.getElementById('insp-modal-export').onclick=()=>exportInspectionXlsx(docId);
+  document.getElementById('modal-inspection').classList.add('open');
+}
+// ── 匯出「製程自主檢驗表」Excel(格式比照 弘丞空白巡檢表.xlsx)──
+async function exportInspectionXlsx(docId){
+  const i=inspections.find(x=>x.docId===docId);if(!i)return;
+  if(typeof ExcelJS==='undefined'){alert('Excel 元件尚未載入,請稍後再試');return;}
+  const wb=new ExcelJS.Workbook();
+  const ws=wb.addWorksheet((`${i.partNo||''} ${i.sectionLabel||i.section||''}`).replace(/[\\\/\?\*\[\]:]/g,'').slice(0,31)||'檢驗表',{pageSetup:{orientation:'landscape',paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:1,margins:{left:0.118,right:0.118,top:0.3,bottom:0.3,header:0.2,footer:0.2}}});
+  const W={A:7.55,B:10.5,C:13,D:8.11,E:9.33,F:10.11,G:8.22,H:9.44,I:8.43,J:8.43,K:8.43,L:8.43,M:7.89,N:0.11,O:8.89,P:8.43,Q:8.43,R:3.44,S:3.33,T:9.55};
+  ws.columns=Object.keys(W).map(k=>({key:k,width:W[k]}));
+  const H={1:30,2:27.75,3:28.5,4:27,5:30.75,6:25,7:25,8:25.5,9:24,10:27,11:25,12:25,13:25,14:25,15:25,16:25,17:25,18:25,19:25,20:25,21:25,22:25,24:21,25:21.75,26:78};
+  Object.keys(H).forEach(r=>ws.getRow(+r).height=H[r]);
+  const M='medium',thin={style:M};
+  const FK=n=>({name:'標楷體',size:n}),FM=n=>({name:'微軟正黑體',size:n});
+  const box=(a,b,c,d)=>({top:a?thin:undefined,bottom:b?thin:undefined,left:c?thin:undefined,right:d?thin:undefined});
+  const set=(ref,val,font,align,border,fmt)=>{const c=ws.getCell(ref);if(val!==undefined)c.value=val;if(font)c.font=font;if(align)c.alignment=align;if(border)c.border=border;if(fmt)c.numFmt=fmt;return c;};
+  const C={horizontal:'center',vertical:'middle'},CT={horizontal:'center',vertical:'top'},L={vertical:'middle'};
+  // 標題
+  ws.mergeCells('A1:T1');ws.mergeCells('A2:T2');
+  set('A1','弘丞精密工業有限公司',FK(22),CT,box(1,0,1,1));set('A2','製程自主檢驗表',FK(22),CT,box(0,0,1,1));
+  // 表頭
+  ws.mergeCells('B3:D3');ws.mergeCells('E3:F3');ws.mergeCells('G3:M3');ws.mergeCells('B4:D4');ws.mergeCells('E4:F4');ws.mergeCells('G4:M4');ws.mergeCells('R4:T4');
+  set('A3','日期:',FM(12),L,box(1,1,1,0));set('B3',i.date||'',FM(12),C,box(1,1,1,1));
+  set('E3',`機台: ${i.machine||''}`,FM(12),L,box(1,1,1,1));
+  set('G3',`圖面版次:                     程式號碼: `,FK(14),{horizontal:'left',vertical:'top'},box(1,1,1,1));
+  set('A4','品名:',FM(12),L,box(1,1,1,0));set('B4',i.partNo||'',FM(12),C,box(1,1,1,1));
+  set('E4',`工段: ${i.sectionLabel||i.section||''}`,FM(12),L,box(1,1,1,1));
+  const qty=(()=>{const o=orders.find(x=>x.docId===i.orderDocId);return o&&o.totalQty?o.totalQty:'';})();
+  set('G4',`判定標準:  符合加工尺寸       加工數量: ${qty}`,FK(14),{horizontal:'left',vertical:'top'},box(1,1,1,1));
+  set('R3','          抽樣數',FM(12),L,box(1,1,1,0));set('R4','',FM(12),C,box(1,1,1,1));
+  ['N','O','P','Q'].forEach(c=>{[3,4].forEach(r=>set(c+r,undefined,FM(12),L,box(1,1,0,0)));});
+  set('T3',undefined,FM(12),L,box(1,1,0,1));
+  // 欄位列
+  const cols=['A','B','C','D','E','F','G','H','I','J','K','L','M'];
+  const heads=['項次','檢驗項目','檢驗標準','檢驗工具','首件','10:30','13:30','15:30','17:30','19:30','21:30','23:30',''];
+  const slotKeys=['first','10:30','13:30','15:30','17:30','19:30','21:30','23:30','extra'];
+  cols.forEach((c,k)=>set(c+'5',heads[k],FM(12),{...C,wrapText:true},box(1,1,1,1)));
+  const s=i.slots||{};if(s.extra&&s.extra.time)ws.getCell('M5').value=s.extra.time;
+  set('R5','       檢驗工具',FM(12),L,box(1,0,1,0));set('T5',undefined,FM(12),L,box(1,0,0,1));
+  // 15 列項目
+  const items=(i.items||[]).slice(0,15);
+  for(let r=0;r<15;r++){
+    const row=6+r,it=items[r];
+    set('A'+row,r+1,FM(12),C,box(1,1,1,1));
+    set('B'+row,it?it.name:'',FM(12),C,box(1,1,1,1));
+    set('C'+row,it?(it.stdText||''):'',FM(12),C,box(1,1,1,1));
+    set('D'+row,it?(it.tool||''):'',FM(12),C,box(1,1,1,1));
+    slotKeys.forEach((k,idx)=>{const col=cols[4+idx];let v='';if(it&&s[k]&&s[k].values&&s[k].values[it.no]!=null){v=s[k].values[it.no];const n=parseFloat(v);if(!isNaN(n)&&String(v).trim()===String(n))v=n;}
+      const c=set(col+row,v,FM(12),C,box(1,1,1,1));if(it&&s[k]&&s[k].judges&&s[k].judges[it.no]==='NG'){c.font={name:'微軟正黑體',size:12,bold:true,color:{argb:'FFC7362F'}};}});
+  }
+  // 量具代碼
+  INSP_TOOLS.forEach((t,k)=>{const row=6+k;set('R'+row,`${t[0]}:${t[1]}`,FK(14),L,box(0,0,1,0));set('T'+row,undefined,FK(14),L,box(0,0,0,1));});
+  for(let row=18;row<=25;row++){set('R'+row,undefined,FM(12),L,box(0,0,1,0));set('T'+row,undefined,FM(12),L,box(0,0,0,1));}
+  // 操作/檢驗人員
+  ws.mergeCells('A21:B21');set('A21','操作人員',FM(12),C,box(1,1,1,1));set('C21',undefined,FM(12),C,box(1,1,1,1));set('D21',undefined,FM(12),C,box(1,1,1,1));
+  set('A22','         檢驗人員',FM(12),L,box(1,1,1,0));set('B22',undefined,FM(12),C,box(1,1,0,1));set('C22',undefined,FM(12),C,box(1,1,1,1));set('D22',undefined,FM(12),C,box(1,1,1,1));
+  slotKeys.forEach((k,idx)=>{const col=cols[4+idx];set(col+'21',undefined,FM(12),C,box(1,1,1,1));set(col+'22',s[k]?(s[k].inspector||''):'',FM(11),C,box(1,1,1,1));});
+  // 備註
+  ws.mergeCells('B23:M23');set('A23',undefined,FM(12),C,box(1,0,1,0));set('B23',undefined,FM(12),L,box(1,0,0,1));
+  set('B24','1.每日開機時操作人員需做外觀檢查,並由現場品管人員作首件檢驗每兩小時作巡檢檢驗。',FM(14),L,box(0,0,0,0));
+  set('A25','備',FM(16),{...C,wrapText:true},box(0,0,1,0));set('B25','2.單位主管需不定期(每週至少一次)對各製程作流程之監控查核,若有不符規定時需立即要求矯正改善。',FM(14),L,box(0,0,0,0));
+  set('A26','註',FM(16),{...C,wrapText:true},box(0,1,1,0));
+  const remarks=slotKeys.filter(k=>s[k]&&s[k].remark).map(k=>`${INSP_SLOTS.find(x=>x[0]===k)[1]}:${s[k].remark}`).join(';');
+  ws.mergeCells('B26:M26');set('B26','注意事項:'+(i.specNotes?i.specNotes+' ':'')+(remarks?' '+remarks:''),FM(12),{vertical:'top',wrapText:true},box(1,1,0,1));
+  ['C','D','E','F','G','H','I','J','K','L','M'].forEach(c=>{set(c+'24',undefined,FM(12),L,box(0,0,0,c==='M'));set(c+'25',undefined,FM(12),L,box(0,0,0,c==='M'));});
+  set('M24',undefined,FM(12),L,box(0,0,0,1));set('M25',undefined,FM(12),L,box(0,0,0,1));
+  set('R26',undefined,FM(12),L,box(0,1,1,0));set('T26',undefined,FM(12),L,box(0,1,0,1));['S','O','P','Q','N'].forEach(c=>set(c+'26',undefined,FM(12),L,box(0,1,0,0)));
+  ws.getCell('M23').border=box(1,0,0,1);
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`製程自主檢驗表_${i.partNo||''}_${i.sectionLabel||i.section||''}_${i.date||''}.xlsx`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
 
 // ── 品質儲存 ──
 function saveDefect(){const date=document.getElementById('d-date').value,product=document.getElementById('d-product').value,qty=parseInt(document.getElementById('d-qty').value)||0,category=document.getElementById('d-category').value;if(!date||!product||qty<=0){alert('請填寫日期、產品名稱及不良數量');return;}const docId=document.getElementById('d-docid').value;const data={date,product,order:document.getElementById('d-order').value,factory:document.getElementById('d-factory').value,machine:document.getElementById('d-machine').value,operator:document.getElementById('d-operator').value,qty,category,description:document.getElementById('d-desc').value,cause:document.getElementById('d-cause').value,action:document.getElementById('d-action').value,handling:document.getElementById('d-handling').value,customer:document.getElementById('d-customer').value,note:document.getElementById('d-note').value};if(docId){db.collection('defects').doc(docId).update(data);}else{data.createdAt=firebase.firestore.FieldValue.serverTimestamp();db.collection('defects').add(data);}closeModal('defect');}
@@ -1701,7 +1864,7 @@ function showApp(payload){
     const tabInv=document.getElementById('tab-inventory');
     if(tabInv)tabInv.style.display='none';
   }
-  loadOrders();loadPurchaseData();loadDefects();loadFinanceData();loadStaff();loadPriceData();loadAccounts();loadInventoryData();loadScheduleData();loadCostSettings();
+  loadOrders();loadPurchaseData();loadDefects();loadInspections();loadFinanceData();loadStaff();loadPriceData();loadAccounts();loadInventoryData();loadScheduleData();loadCostSettings();
 }
 function signOut(){firebase.auth().signOut().then(()=>{google.accounts.id.disableAutoSelect();location.reload();});}
 function parseJwt(token){const base64=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');return JSON.parse(decodeURIComponent(atob(base64).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')));}
