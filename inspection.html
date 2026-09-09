@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>HCPI 製程巡檢</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<style>
+:root{--brand:#5B21F4;--brand-dark:#4318C4;--brand-light:#EDE9FD;--gray-50:#F9F9F9;--gray-100:#F1F1F1;--gray-200:#E2E2E2;--gray-400:#A0A0A0;--gray-600:#5A5A5A;--gray-800:#222222;--white:#FFFFFF;--success:#2E7D3B;--success-bg:#E1F3E4;--warning:#946010;--warning-bg:#FBEED4;--danger:#C7362F;--danger-bg:#FBE6E4;--radius:12px;--radius-sm:8px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif;background:var(--gray-50);color:var(--gray-800);min-height:100vh;}
+.header{background:var(--brand);padding:1.1rem 1.25rem;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
+.header-logo{width:36px;height:36px;object-fit:contain;}
+.header-title{color:white;font-size:16px;font-weight:600;}
+.header-sub{color:rgba(255,255,255,0.7);font-size:12px;margin-top:2px;}
+.machine-badge{background:rgba(255,255,255,0.2);color:white;font-size:13px;font-weight:600;padding:6px 14px;border-radius:99px;margin-left:auto;white-space:nowrap;}
+.main{max-width:520px;margin:0 auto;padding:1rem 1rem 3rem;}
+.card{background:var(--white);border-radius:var(--radius);border:1px solid var(--gray-200);padding:1.25rem;margin-bottom:1rem;}
+.card-title{font-size:14px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px;}
+.card-dot{width:8px;height:8px;border-radius:50%;background:var(--brand);}
+.card-title .right{margin-left:auto;font-size:12px;font-weight:400;color:var(--gray-400);}
+.form-row{margin-bottom:.9rem;}
+.form-label{font-size:13px;color:var(--gray-600);margin-bottom:6px;display:block;font-weight:500;}
+.form-input,.form-select{width:100%;font-size:16px;padding:12px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:var(--gray-50);color:var(--gray-800);}
+.form-input:focus,.form-select:focus{outline:none;border-color:var(--brand);background:var(--white);}
+.date-display{font-size:15px;padding:12px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-100);background:var(--gray-100);color:var(--gray-600);}
+.toggle-row{display:flex;gap:8px;margin-bottom:8px;}
+.toggle-btn{flex:1;font-size:13px;padding:9px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:transparent;color:var(--gray-600);cursor:pointer;}
+.toggle-btn.active{border-color:var(--brand);background:var(--brand-light);color:var(--brand);font-weight:600;}
+.btn{width:100%;font-size:16px;font-weight:600;padding:14px;border-radius:var(--radius);border:none;background:var(--brand);color:var(--white);cursor:pointer;}
+.btn:active{background:var(--brand-dark);}
+.btn:disabled{background:var(--gray-200);color:var(--gray-400);cursor:not-allowed;}
+.btn-outline{width:100%;font-size:15px;font-weight:500;padding:12px;border-radius:var(--radius);border:2px solid var(--brand);background:transparent;color:var(--brand);cursor:pointer;}
+.btn-sm{font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer;}
+.hint{font-size:12px;color:var(--gray-400);line-height:1.6;margin-top:6px;}
+.note{font-size:13px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--warning-bg);color:var(--warning);line-height:1.5;margin-bottom:.9rem;}
+.note.ok{background:var(--success-bg);color:var(--success);}
+.note.err{background:var(--danger-bg);color:var(--danger);}
+.order-preview{background:var(--gray-50);border-radius:var(--radius-sm);padding:8px 10px;margin-top:6px;font-size:12px;color:var(--gray-600);}
+.order-item{display:flex;justify-content:space-between;padding:6px 8px;border-radius:6px;border:1px solid transparent;margin-bottom:3px;}
+.order-item.selected{background:var(--brand-light);border-color:var(--brand);}
+/* 規格項目編輯列 */
+.spec-row{border:1.5px solid var(--gray-200);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px;background:var(--white);}
+.spec-row.unsure{border-color:#E0B341;background:#FFFBEA;}
+.spec-row .r1{display:grid;grid-template-columns:28px 1fr 1fr;gap:6px;margin-bottom:6px;align-items:center;}
+.spec-row .r2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+.spec-row input,.spec-row select{font-size:14px;padding:8px;border-radius:6px;border:1px solid var(--gray-200);background:var(--gray-50);width:100%;min-width:0;}
+.spec-row .no{font-size:13px;font-weight:600;color:var(--gray-400);text-align:center;}
+.spec-row .unsure-txt{font-size:11px;color:var(--warning);margin-top:6px;line-height:1.4;}
+.spec-row .del{grid-column:1/-1;text-align:right;margin-top:4px;}
+/* 時段 chips */
+.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:1rem;}
+.slot{font-size:13px;padding:10px 4px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer;text-align:center;position:relative;}
+.slot.active{border-color:var(--brand);background:var(--brand-light);color:var(--brand);font-weight:600;}
+.slot.done::after{content:'✓';position:absolute;top:2px;right:6px;font-size:11px;color:var(--success);}
+.slot.ng::after{content:'✗';color:var(--danger);}
+/* 量測輸入列 */
+.m-row{display:grid;grid-template-columns:1fr 120px 52px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--gray-100);}
+.m-row:last-child{border-bottom:none;}
+.m-name{font-size:15px;font-weight:600;}
+.m-std{font-size:12px;color:var(--gray-400);margin-top:2px;}
+.m-input{font-size:20px;font-weight:600;padding:10px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:var(--gray-50);text-align:center;width:100%;}
+.m-input:focus{outline:none;border-color:var(--brand);background:var(--white);}
+.m-input.ok{border-color:var(--success);background:var(--success-bg);}
+.m-input.ng{border-color:var(--danger);background:var(--danger-bg);}
+.judge{font-size:13px;font-weight:700;text-align:center;padding:8px 0;border-radius:6px;}
+.judge.ok{color:var(--success);background:var(--success-bg);}
+.judge.ng{color:var(--danger);background:var(--danger-bg);}
+.judge.na{color:var(--gray-400);background:var(--gray-100);}
+.okng{display:flex;gap:4px;grid-column:2/4;}
+.okng button{flex:1;font-size:14px;font-weight:600;padding:10px 0;border-radius:6px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);}
+.okng button.ok.active{border-color:var(--success);background:var(--success-bg);color:var(--success);}
+.okng button.ng.active{border-color:var(--danger);background:var(--danger-bg);color:var(--danger);}
+/* 總表 */
+.grid-wrap{overflow-x:auto;margin-top:.5rem;}
+table.grid{border-collapse:collapse;font-size:11px;white-space:nowrap;}
+table.grid th,table.grid td{border:1px solid var(--gray-200);padding:4px 6px;text-align:center;}
+table.grid th{background:var(--gray-100);font-weight:600;}
+table.grid td.ok{background:var(--success-bg);color:var(--success);}
+table.grid td.ng{background:var(--danger-bg);color:var(--danger);font-weight:700;}
+table.grid td.name{text-align:left;font-weight:600;}
+.success-screen,.error-screen{display:none;text-align:center;padding:3rem 1.5rem;}
+.success-icon{width:64px;height:64px;border-radius:50%;background:var(--success);color:white;font-size:32px;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;}
+.error-icon{font-size:48px;margin-bottom:1rem;}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-3px;margin-right:6px;}
+@keyframes sp{to{transform:rotate(360deg)}}
+.photo-preview{width:100%;border-radius:var(--radius-sm);margin-bottom:8px;max-height:220px;object-fit:contain;background:#111;}
+</style>
+</head>
+<body>
+
+<div id="form-screen">
+  <div class="header">
+    <img class="header-logo" src="https://raw.githubusercontent.com/mingchia7/hcpi-order-system/main/logo.png" onerror="this.style.display='none'" />
+    <div>
+      <div class="header-title">HCPI 製程巡檢</div>
+      <div class="header-sub">製程自主檢驗表・弘丞精密工業</div>
+    </div>
+    <div class="machine-badge" id="machine-badge">-</div>
+  </div>
+
+  <div class="main">
+    <!-- 1. 基本資料 -->
+    <div class="card">
+      <div class="card-title"><div class="card-dot"></div>基本資料<span class="right" id="display-date"></span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:.9rem;">
+        <div><div class="form-label">廠別</div><div class="date-display" id="display-factory">-</div></div>
+        <div><div class="form-label">機台</div><div class="date-display" id="display-machine">-</div></div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">檢驗人員</label>
+        <select class="form-select" id="input-inspector"><option value="">── 請選擇 ──</option></select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">品名 / 件號</label>
+        <div class="toggle-row">
+          <button class="toggle-btn active" id="toggle-select" onclick="switchMode('select')">從訂單選擇</button>
+          <button class="toggle-btn" id="toggle-manual" onclick="switchMode('manual')">手動輸入</button>
+        </div>
+        <div id="select-wrap">
+          <select class="form-select" id="input-product-select" onchange="onPartChange()"><option value="">載入訂單中...</option></select>
+          <div class="order-preview" id="order-preview" style="display:none;"></div>
+        </div>
+        <div id="manual-wrap" style="display:none;">
+          <input class="form-input" id="input-product-manual" placeholder="輸入品名或件號" onchange="onPartChange()" />
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">工段</label>
+        <select class="form-select" id="input-section" onchange="onPartChange()">
+          <option value="">請選擇工段</option>
+          <option value="CT1">CT1（車1）</option><option value="CT2">CT2（車2）</option>
+          <option value="CT3">CT3（車3）</option><option value="CT4">CT4（車4）</option>
+          <option value="CT5">CT5（車5）</option><option value="CTF">CTF（車完工）</option>
+          <option value="CM1">CM1（銑1）</option><option value="CM2">CM2（銑2）</option>
+          <option value="CM3">CM3（銑3）</option><option value="CM4">CM4（銑4）</option>
+          <option value="CM5">CM5（銑5）</option><option value="CMF">CMF（銑完工）</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 2. 檢驗項目(規格) -->
+    <div class="card" id="spec-card" style="display:none;">
+      <div class="card-title"><div class="card-dot"></div>檢驗項目<span class="right" id="spec-status"></span></div>
+      <div id="spec-view"></div>
+      <div id="spec-actions"></div>
+      <div id="spec-edit" style="display:none;">
+        <img id="photo-preview" class="photo-preview" style="display:none;" />
+        <div id="spec-ai-note"></div>
+        <div id="spec-rows"></div>
+        <div style="display:flex;gap:8px;margin:8px 0 12px;">
+          <button class="btn-sm" onclick="addSpecRow()">＋ 新增項目</button>
+          <button class="btn-sm" onclick="recognizeAgain()">📷 重新拍照辨識</button>
+        </div>
+        <div class="form-row"><label class="form-label">備註(圖面版次 / 程式號碼 / 其他)</label><input class="form-input" id="spec-notes" placeholder="例如:最長邊為主" /></div>
+        <button class="btn" id="btn-save-spec" onclick="saveSpec()">儲存檢驗項目</button>
+        <div class="hint">儲存後,同一件號 + 工段之後掃描就直接沿用,不用再拍。</div>
+      </div>
+      <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none;" onchange="onPhotoPicked(event)" />
+    </div>
+
+    <!-- 3. 量測輸入 -->
+    <div class="card" id="measure-card" style="display:none;">
+      <div class="card-title"><div class="card-dot"></div>量測輸入<span class="right" id="measure-status"></span></div>
+      <div class="form-label">時段</div>
+      <div class="slots" id="slots"></div>
+      <div id="measure-rows"></div>
+      <div class="form-row" style="margin-top:.5rem;"><label class="form-label">備註(選填)</label><input class="form-input" id="input-remark" placeholder="例如:換刀後首件" /></div>
+      <button class="btn" id="btn-submit" onclick="submitMeasure()">送出本時段量測</button>
+      <div class="grid-wrap" id="grid-wrap"></div>
+    </div>
+  </div>
+</div>
+
+<div class="success-screen" id="success-screen">
+  <div class="success-icon">✓</div>
+  <div style="font-size:18px;font-weight:600;margin-bottom:.5rem;" id="success-title">已儲存</div>
+  <div style="font-size:14px;color:var(--gray-600);line-height:1.7;margin-bottom:1.5rem;" id="success-sub"></div>
+  <button class="btn-outline" onclick="backToForm()">繼續巡檢</button>
+</div>
+
+<div class="error-screen" id="error-screen">
+  <div class="error-icon">⚠️</div>
+  <div style="font-size:18px;font-weight:600;color:var(--danger);margin-bottom:.5rem;">無效的機台連結</div>
+  <div style="font-size:14px;color:var(--gray-600);">請掃描機台上的「巡檢」QR Code 進入</div>
+</div>
+
+<script>
+// ── Firebase ──
+var firebaseConfig = {
+  apiKey: "AIzaSyBFbGFazvMc-S6jN-vyuSt6I6ryvjDIRhE",
+  authDomain: "hcpi-order-system.firebaseapp.com",
+  projectId: "hcpi-order-system",
+  storageBucket: "hcpi-order-system.firebasestorage.app",
+  messagingSenderId: "950890521894",
+  appId: "1:950890521894:web:5580143e80b484570e4de7"
+};
+firebase.initializeApp(firebaseConfig);
+var db = firebase.firestore();
+firebase.auth().signInAnonymously().catch(function(e){ console.error('Auth error:', e); });
+
+var RECOGNIZE_API = '/api/recognize';
+var TOOLS = [['A','游標卡尺'],['B','分厘卡(卡規)'],['C','缸徑規'],['D','高(深)度規'],['E','塞規'],['F','R規'],['G','牙規'],['H','三次元測量儀'],['I','投影機'],['J','表面粗度儀'],['K','檢具'],['L','目視']];
+var SLOTS = [['first','首件'],['10:30','10:30'],['13:30','13:30'],['15:30','15:30'],['17:30','17:30'],['19:30','19:30'],['21:30','21:30'],['23:30','23:30'],['extra','其他']];
+var SECTION_LABEL = {CT1:'車1',CT2:'車2',CT3:'車3',CT4:'車4',CT5:'車5',CTF:'車完工',CM1:'銑1',CM2:'銑2',CM3:'銑3',CM4:'銑4',CM5:'銑5',CMF:'銑完工'};
+
+function getParam(n){var m=new RegExp('[?&]'+n+'=([^&#]*)').exec(location.href);return m?decodeURIComponent(m[1].replace(/\+/g,' ')):'';}
+var factory=getParam('factory'), machine=getParam('machine');
+var todayISO=(function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
+
+var productMode='select', activeOrders=[], matchedOrders=[];
+var spec=null;        // {docId, partNo, section, items[], notes}
+var specDraft=[];     // 編輯中的項目
+var inspection=null;  // 今天這台機 + 件號 + 工段 的巡檢單 {docId, slots{}}
+var currentSlot='first';
+var lastPhotoB64=null;
+
+// ── 初始化 ──
+function init(){
+  if(!factory||!machine){document.getElementById('form-screen').style.display='none';document.getElementById('error-screen').style.display='block';return;}
+  document.getElementById('machine-badge').textContent=machine;
+  document.getElementById('display-factory').textContent=factory;
+  document.getElementById('display-machine').textContent=machine;
+  document.getElementById('display-date').textContent=todayISO;
+  loadStaff(); loadOrders();
+  try{var last=localStorage.getItem('hcpi_inspector');if(last)setTimeout(function(){document.getElementById('input-inspector').value=last;},800);}catch(e){}
+}
+document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
+
+function loadStaff(){
+  db.collection('staff').orderBy('createdAt','asc').get().then(function(snap){
+    var sel=document.getElementById('input-inspector');
+    sel.innerHTML='<option value="">── 請選擇 ──</option>';
+    snap.forEach(function(d){var o=document.createElement('option');o.value=d.data().name;o.textContent=d.data().name;sel.appendChild(o);});
+    if(snap.empty)sel.innerHTML+='<option value="" disabled>尚無人員資料,請先在主系統新增</option>';
+  }).catch(function(e){console.error(e);});
+}
+function loadOrders(){
+  db.collection('orders').get().then(function(snap){
+    activeOrders=snap.docs.map(function(d){return Object.assign({docId:d.id},d.data());}).filter(function(o){return ['入料中','生產中','生產完成'].indexOf(o.stage)!==-1;});
+    var names=[];activeOrders.forEach(function(o){if(o.name&&names.indexOf(o.name)===-1)names.push(o.name);});
+    var sel=document.getElementById('input-product-select');
+    sel.innerHTML='<option value="">請選擇品名</option>'+names.map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>';}).join('');
+  }).catch(function(){switchMode('manual');});
+}
+function switchMode(m){productMode=m;document.getElementById('toggle-select').className='toggle-btn'+(m==='select'?' active':'');document.getElementById('toggle-manual').className='toggle-btn'+(m==='manual'?' active':'');document.getElementById('select-wrap').style.display=m==='select'?'block':'none';document.getElementById('manual-wrap').style.display=m==='manual'?'block':'none';onPartChange();}
+function getPartNo(){return productMode==='select'?document.getElementById('input-product-select').value:document.getElementById('input-product-manual').value.trim();}
+function getSection(){return document.getElementById('input-section').value;}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+// ── 選了件號 + 工段 → 找規格、找今天的巡檢單 ──
+async function onPartChange(){
+  var partNo=getPartNo(), section=getSection();
+  matchedOrders=activeOrders.filter(function(o){return o.name===partNo;});
+  var pv=document.getElementById('order-preview');
+  if(productMode==='select'&&matchedOrders.length){pv.style.display='block';pv.innerHTML='進行中訂單:'+matchedOrders.map(function(o){return '<div class="order-item"><span>'+esc(o.id)+'</span><span>'+esc(o.client||'-')+' / '+(o.totalQty||'?')+' pcs</span></div>';}).join('');}else pv.style.display='none';
+  spec=null;inspection=null;
+  document.getElementById('measure-card').style.display='none';
+  if(!partNo||!section){document.getElementById('spec-card').style.display='none';return;}
+  document.getElementById('spec-card').style.display='block';
+  document.getElementById('spec-status').textContent='查詢中...';
+  document.getElementById('spec-view').innerHTML='';document.getElementById('spec-actions').innerHTML='';document.getElementById('spec-edit').style.display='none';
+  try{
+    var qs=await db.collection('inspectionSpecs').where('partNo','==',partNo).where('section','==',section).get();
+    if(!qs.empty){
+      var d=qs.docs[0];spec=Object.assign({docId:d.id},d.data());
+      document.getElementById('spec-status').textContent='已有規格('+(spec.items||[]).length+' 項)';
+      renderSpecView();
+      await loadInspection();
+    }else{
+      document.getElementById('spec-status').textContent='尚無規格';
+      document.getElementById('spec-view').innerHTML='<div class="note">這個件號 + 工段還沒有檢驗項目。第一次請拍規格卡讓 AI 帶出,或手動新增。</div>';
+      document.getElementById('spec-actions').innerHTML='<button class="btn" onclick="pickPhoto()">📷 拍規格卡自動辨識</button><div style="height:8px"></div><button class="btn-outline" onclick="startManualSpec()">✎ 手動新增檢驗項目</button>';
+    }
+  }catch(e){console.error(e);document.getElementById('spec-status').textContent='查詢失敗';document.getElementById('spec-view').innerHTML='<div class="note err">讀取規格失敗:'+esc(e.message)+'</div>';}
+}
+
+function renderSpecView(){
+  var items=spec.items||[];
+  document.getElementById('spec-view').innerHTML='<table class="grid" style="width:100%"><tr><th>#</th><th>項目</th><th>標準</th><th>量具</th><th>刀號</th></tr>'+
+    items.map(function(it){return '<tr><td>'+it.no+'</td><td class="name">'+esc(it.name)+'</td><td>'+esc(it.stdText)+'</td><td>'+esc(it.tool||'')+'</td><td>'+esc(it.toolNo||'')+'</td></tr>';}).join('')+'</table>'+
+    (spec.notes?'<div class="hint">備註:'+esc(spec.notes)+'</div>':'');
+  document.getElementById('spec-actions').innerHTML='<div style="display:flex;gap:8px;margin-top:8px;"><button class="btn-sm" onclick="editSpec()">✎ 修改項目</button><button class="btn-sm" onclick="pickPhoto()">📷 重新拍照辨識</button></div>';
+  document.getElementById('spec-edit').style.display='none';
+}
+
+// ── 拍照 → 縮圖 → 呼叫辨識 API ──
+function pickPhoto(){document.getElementById('photo-input').value='';document.getElementById('photo-input').click();}
+function recognizeAgain(){pickPhoto();}
+function onPhotoPicked(ev){
+  var f=ev.target.files&&ev.target.files[0];if(!f)return;
+  var img=new Image();var url=URL.createObjectURL(f);
+  img.onload=function(){
+    var max=1600,w=img.width,h=img.height,s=Math.min(1,max/Math.max(w,h));
+    var c=document.createElement('canvas');c.width=Math.round(w*s);c.height=Math.round(h*s);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    var b64=c.toDataURL('image/jpeg',0.85);
+    URL.revokeObjectURL(url);
+    lastPhotoB64=b64;
+    var pv=document.getElementById('photo-preview');pv.src=b64;pv.style.display='block';
+    recognize(b64);
+  };
+  img.onerror=function(){alert('照片讀取失敗');};
+  img.src=url;
+}
+async function recognize(b64){
+  document.getElementById('spec-edit').style.display='block';
+  document.getElementById('spec-actions').innerHTML='';
+  document.getElementById('spec-view').innerHTML='';
+  document.getElementById('spec-ai-note').innerHTML='<div class="note"><span class="spinner" style="border-color:rgba(148,96,16,.3);border-top-color:var(--warning)"></span>AI 辨識中,約 10 秒...</div>';
+  document.getElementById('spec-rows').innerHTML='';
+  try{
+    var user=firebase.auth().currentUser;var token=user?await user.getIdToken():'';
+    var hint='件號:'+getPartNo()+',工段:'+(SECTION_LABEL[getSection()]||getSection());
+    var r=await fetch(RECOGNIZE_API,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({image:b64,hint:hint})});
+    var j=await r.json();
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    specDraft=(j.items||[]).map(function(it,i){return {no:i+1,name:it.name||'',stdText:it.stdText||'',nominal:it.nominal,tolPlus:it.tolPlus,tolMinus:it.tolMinus,tool:guessTool(it.name,it.tolPlus),toolNo:it.toolNo||'',note:it.note||'',confidence:it.confidence,unsure:it.unsure||''};});
+    if(specDraft.length&&!specDraft.some(function(x){return /外觀/.test(x.name);}))specDraft.unshift({no:0,name:'外觀',stdText:'無刮傷',nominal:null,tolPlus:null,tolMinus:null,tool:'L',toolNo:'',note:'',confidence:1,unsure:''});
+    renumber();
+    var low=specDraft.filter(function(x){return (x.confidence||0)<0.8;}).length;
+    document.getElementById('spec-ai-note').innerHTML='<div class="note '+(low?'':'ok')+'">辨識完成,共 '+specDraft.length+' 項'+(low?',其中 '+low+' 項不確定(黃底),請核對後再儲存。':'。請核對後儲存。')+(j.partNo?'<br>卡片上的件號:'+esc(j.partNo):'')+(j.date?' 日期:'+esc(j.date):'')+'</div>';
+    if(j.notes)document.getElementById('spec-notes').value=j.notes;
+    renderSpecRows();
+  }catch(e){
+    console.error(e);
+    document.getElementById('spec-ai-note').innerHTML='<div class="note err">辨識失敗:'+esc(e.message)+'<br>可以重拍,或改用手動新增。</div>';
+    if(!specDraft.length)startManualSpec(true);
+  }
+}
+function guessTool(name,tol){name=name||'';if(/外觀/.test(name))return 'L';if(/牙/.test(name))return 'G';if(/粗/.test(name))return 'J';if(/內孔深|深度|高度|階/.test(name))return 'D';if(/內孔|內徑/.test(name))return (tol!=null&&tol<=0.03)?'C':'A';if(/溝|槽/.test(name))return 'A';if(/外徑|外/.test(name))return (tol!=null&&tol<=0.03)?'B':'A';return 'A';}
+
+// ── 規格編輯列 ──
+function startManualSpec(keep){
+  if(!keep){specDraft=[{no:1,name:'外觀',stdText:'無刮傷',tool:'L',toolNo:'',note:'',confidence:1,unsure:''},{no:2,name:'',stdText:'',tool:'A',toolNo:'',note:'',confidence:1,unsure:''}];}
+  document.getElementById('spec-view').innerHTML='';document.getElementById('spec-actions').innerHTML='';
+  document.getElementById('spec-edit').style.display='block';
+  document.getElementById('spec-ai-note').innerHTML='';
+  renderSpecRows();
+}
+function editSpec(){specDraft=(spec.items||[]).map(function(x){return Object.assign({},x);});document.getElementById('spec-notes').value=spec.notes||'';startManualSpec(true);}
+function renumber(){specDraft.forEach(function(x,i){x.no=i+1;});}
+function renderSpecRows(){
+  document.getElementById('spec-rows').innerHTML=specDraft.map(function(it,i){
+    return '<div class="spec-row'+((it.confidence||1)<0.8?' unsure':'')+'" id="sr-'+i+'">'+
+      '<div class="r1"><div class="no">'+it.no+'</div>'+
+      '<input placeholder="項目(例:內孔)" value="'+esc(it.name)+'" oninput="specDraft['+i+'].name=this.value" />'+
+      '<input placeholder="標準(例:66.33±0.02)" value="'+esc(it.stdText)+'" oninput="onStdInput('+i+',this.value)" /></div>'+
+      '<div class="r2"><select onchange="specDraft['+i+'].tool=this.value">'+TOOLS.map(function(t){return '<option value="'+t[0]+'"'+(it.tool===t[0]?' selected':'')+'>'+t[0]+':'+t[1]+'</option>';}).join('')+'</select>'+
+      '<input placeholder="刀號" value="'+esc(it.toolNo)+'" oninput="specDraft['+i+'].toolNo=this.value" />'+
+      '<input placeholder="旁註" value="'+esc(it.note)+'" oninput="specDraft['+i+'].note=this.value" /></div>'+
+      (it.unsure?'<div class="unsure-txt">⚠ '+esc(it.unsure)+'</div>':'')+
+      '<div class="del"><button class="btn-sm" onclick="removeSpecRow('+i+')">刪除</button></div></div>';
+  }).join('');
+}
+function onStdInput(i,v){specDraft[i].stdText=v;var p=parseStd(v);specDraft[i].nominal=p?p.nominal:null;specDraft[i].tolPlus=p?p.tolPlus:null;specDraft[i].tolMinus=p?p.tolMinus:null;}
+function addSpecRow(){specDraft.push({no:specDraft.length+1,name:'',stdText:'',tool:'A',toolNo:'',note:'',confidence:1,unsure:''});renderSpecRows();}
+function removeSpecRow(i){specDraft.splice(i,1);renumber();renderSpecRows();}
+
+// 解析「66.33±0.02」「110.3 +0.3/-0」「Φ125.5±0.1」「27.15 ±0.05」
+function parseStd(s){
+  if(!s)return null;s=String(s).replace(/[Φφ∅ØΦ]/g,'').replace(/,/g,'.').replace(/\s+/g,'');
+  var m=s.match(/^(-?\d+(?:\.\d+)?)±(\d+(?:\.\d+)?)/);if(m)return {nominal:+m[1],tolPlus:+m[2],tolMinus:+m[2]};
+  m=s.match(/^(-?\d+(?:\.\d+)?)\+(\d+(?:\.\d+)?)\/?-(\d+(?:\.\d+)?)/);if(m)return {nominal:+m[1],tolPlus:+m[2],tolMinus:+m[3]};
+  m=s.match(/^(-?\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)\/?\+(\d+(?:\.\d+)?)/);if(m)return {nominal:+m[1],tolPlus:+m[3],tolMinus:+m[2]};
+  m=s.match(/^(-?\d+(?:\.\d+)?)~(-?\d+(?:\.\d+)?)$/);if(m){var lo=Math.min(+m[1],+m[2]),hi=Math.max(+m[1],+m[2]);return {nominal:+((lo+hi)/2).toFixed(4),tolPlus:+((hi-lo)/2).toFixed(4),tolMinus:+((hi-lo)/2).toFixed(4)};}
+  m=s.match(/^(-?\d+(?:\.\d+)?)$/);if(m)return {nominal:+m[1],tolPlus:null,tolMinus:null};
+  return null;
+}
+function judge(it,val){
+  if(val===''||val==null)return 'na';
+  if(val==='OK')return 'ok';if(val==='NG')return 'ng';
+  var v=parseFloat(val);if(isNaN(v))return 'na';
+  var p=(it.nominal!=null)?{nominal:it.nominal,tolPlus:it.tolPlus,tolMinus:it.tolMinus}:parseStd(it.stdText);
+  if(!p||p.tolPlus==null||p.tolMinus==null)return 'na';
+  var lo=p.nominal-p.tolMinus-1e-9,hi=p.nominal+p.tolPlus+1e-9;
+  return (v>=lo&&v<=hi)?'ok':'ng';
+}
+function isVisual(it){return /外觀|目視|無刮傷|毛邊/.test((it.name||'')+(it.stdText||''))||(it.tool==='L'&&!parseStd(it.stdText));}
+
+async function saveSpec(){
+  var partNo=getPartNo(),section=getSection();
+  var items=specDraft.filter(function(x){return x.name.trim();}).map(function(x,i){var p=parseStd(x.stdText);return {no:i+1,name:x.name.trim(),stdText:x.stdText.trim(),nominal:p?p.nominal:null,tolPlus:p?p.tolPlus:null,tolMinus:p?p.tolMinus:null,tool:x.tool||'A',toolNo:x.toolNo||'',note:x.note||'',confidence:x.confidence==null?1:x.confidence};});
+  if(!items.length){alert('至少要有一個檢驗項目');return;}
+  var btn=document.getElementById('btn-save-spec');btn.disabled=true;btn.textContent='儲存中...';
+  try{
+    var doc={partNo:partNo,section:section,items:items,notes:document.getElementById('spec-notes').value.trim(),machine:machine,factory:factory,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:document.getElementById('input-inspector').value||''};
+    if(spec&&spec.docId){await db.collection('inspectionSpecs').doc(spec.docId).update(doc);}
+    else{doc.createdAt=firebase.firestore.FieldValue.serverTimestamp();var ref=await db.collection('inspectionSpecs').add(doc);spec={docId:ref.id};}
+    spec=Object.assign(spec,doc);
+    document.getElementById('spec-status').textContent='已儲存('+items.length+' 項)';
+    renderSpecView();
+    await loadInspection();
+  }catch(e){alert('儲存失敗:'+e.message);}
+  btn.disabled=false;btn.textContent='儲存檢驗項目';
+}
+
+// ── 今天的巡檢單 ──
+async function loadInspection(){
+  var partNo=getPartNo(),section=getSection();
+  var qs=await db.collection('inspections').where('date','==',todayISO).where('machine','==',machine).where('partNo','==',partNo).where('section','==',section).get();
+  inspection=qs.empty?{docId:null,slots:{}}:Object.assign({docId:qs.docs[0].id},qs.docs[0].data());
+  if(!inspection.slots)inspection.slots={};
+  // 自動選最近尚未填的時段
+  var now=new Date(),hm=now.getHours()*60+now.getMinutes();
+  currentSlot='first';
+  if(inspection.slots.first){currentSlot='extra';var best=null;SLOTS.slice(1,8).forEach(function(s){var t=s[0].split(':'),m=+t[0]*60+ +t[1];if(!inspection.slots[s[0]]&&Math.abs(m-hm)<=90&&(best==null||Math.abs(m-hm)<best.d))best={k:s[0],d:Math.abs(m-hm)};});if(best)currentSlot=best.k;}
+  draftVals={};
+  document.getElementById('measure-card').style.display='block';
+  renderSlots();renderMeasureRows();renderGrid();
+}
+function renderSlots(){
+  document.getElementById('slots').innerHTML=SLOTS.map(function(s){var d=inspection.slots[s[0]];var cls='slot'+(currentSlot===s[0]?' active':'')+(d?' done':'')+(d&&d.ng>0?' ng':'');return '<div class="'+cls+'" onclick="selectSlot(\''+s[0]+'\')">'+s[1]+'</div>';}).join('');
+  var filled=Object.keys(inspection.slots).length;document.getElementById('measure-status').textContent=filled?'今天已填 '+filled+' 個時段':'今天尚未填寫';
+}
+function selectSlot(k){currentSlot=k;draftVals={};renderSlots();renderMeasureRows();}
+function renderMeasureRows(){
+  var items=spec.items||[];var saved=inspection.slots[currentSlot]||{};var vals=saved.values||{};
+  document.getElementById('measure-rows').innerHTML=items.map(function(it){
+    var v=draftVals[it.no]!=null?draftVals[it.no]:(vals[it.no]!=null?vals[it.no]:'');var j=judge(it,v);
+    if(isVisual(it)){return '<div class="m-row"><div><div class="m-name">'+it.no+'. '+esc(it.name)+'</div><div class="m-std">'+esc(it.stdText)+'</div></div><div class="okng"><button class="ok'+(v==='OK'?' active':'')+'" onclick="setVisual('+it.no+',\'OK\')">OK</button><button class="ng'+(v==='NG'?' active':'')+'" onclick="setVisual('+it.no+',\'NG\')">NG</button></div></div>';}
+    return '<div class="m-row"><div><div class="m-name">'+it.no+'. '+esc(it.name)+'</div><div class="m-std">'+esc(it.stdText)+(it.tool?' ・ '+it.tool:'')+'</div></div>'+
+      '<input class="m-input '+(j==='ok'?'ok':j==='ng'?'ng':'')+'" id="mv-'+it.no+'" type="text" inputmode="decimal" value="'+esc(v)+'" placeholder="—" oninput="onMeasureInput('+it.no+',this)" />'+
+      '<div class="judge '+j+'" id="mj-'+it.no+'">'+(j==='ok'?'OK':j==='ng'?'NG':'–')+'</div></div>';
+  }).join('');
+  if(saved.inspector)document.getElementById('input-remark').value=saved.remark||'';
+  document.getElementById('btn-submit').textContent=(saved.values?'更新':'送出')+'「'+slotLabel(currentSlot)+'」量測';
+}
+var draftVals={};
+function onMeasureInput(no,el){var it=(spec.items||[]).find(function(x){return x.no===no;});var v=el.value.trim();draftVals[no]=v;var j=judge(it,v);el.className='m-input '+(j==='ok'?'ok':j==='ng'?'ng':'');var je=document.getElementById('mj-'+no);je.className='judge '+j;je.textContent=j==='ok'?'OK':j==='ng'?'NG':'–';}
+function setVisual(no,v){draftVals[no]=v;renderMeasureRows();}
+function slotLabel(k){var s=SLOTS.find(function(x){return x[0]===k;});return s?s[1]:k;}
+
+async function submitMeasure(){
+  var inspector=document.getElementById('input-inspector').value;
+  if(!inspector){alert('請選擇檢驗人員');return;}
+  var items=spec.items||[];var values={},judges={},ng=0,empty=0;
+  items.forEach(function(it){
+    var v;if(isVisual(it)){v=draftVals[it.no]!=null?draftVals[it.no]:((inspection.slots[currentSlot]||{}).values||{})[it.no];}
+    else{var el=document.getElementById('mv-'+it.no);v=el?el.value.trim():'';}
+    if(v==null||v===''){empty++;return;}
+    values[it.no]=v;var j=judge(it,v);judges[it.no]=j==='ok'?'OK':j==='ng'?'NG':'-';if(j==='ng')ng++;
+  });
+  if(!Object.keys(values).length){alert('請至少輸入一個量測值');return;}
+  if(empty&&!confirm('還有 '+empty+' 項沒有填,確定送出?'))return;
+  if(ng&&!confirm('有 '+ng+' 項 NG,確定送出?(NG 會記錄在系統)'))return;
+  var btn=document.getElementById('btn-submit');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>儲存中...';
+  try{
+    var now=new Date();
+    var slotData={values:values,judges:judges,ng:ng,inspector:inspector,remark:document.getElementById('input-remark').value.trim(),time:String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),savedAt:new Date().toISOString()};
+    var update={};update['slots.'+currentSlot]=slotData;update.updatedAt=firebase.firestore.FieldValue.serverTimestamp();update.lastInspector=inspector;
+    if(inspection.docId){
+      update.ngTotal=Object.keys(inspection.slots).reduce(function(s,k){return s+(k===currentSlot?0:(inspection.slots[k].ng||0));},0)+ng;
+      await db.collection('inspections').doc(inspection.docId).update(update);
+    }else{
+      var ord=matchedOrders[0]||null;
+      var doc={date:todayISO,factory:factory,machine:machine,partNo:getPartNo(),section:section_(),sectionLabel:SECTION_LABEL[section_()]||section_(),orderId:ord?ord.id:'',orderDocId:ord?ord.docId:'',client:ord?(ord.client||''):'',specId:spec.docId||'',items:spec.items||[],specNotes:spec.notes||'',slots:{},ngTotal:ng,lastInspector:inspector,createdAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+      doc.slots[currentSlot]=slotData;
+      var ref=await db.collection('inspections').add(doc);inspection.docId=ref.id;
+    }
+    inspection.slots[currentSlot]=slotData;draftVals={};
+    try{localStorage.setItem('hcpi_inspector',inspector);}catch(e){}
+    document.getElementById('form-screen').style.display='none';
+    document.getElementById('success-screen').style.display='block';
+    document.getElementById('success-title').textContent=ng?'已儲存(有 '+ng+' 項 NG)':'已儲存,全部 OK';
+    document.getElementById('success-sub').innerHTML=esc(getPartNo())+' ・ '+esc(SECTION_LABEL[section_()]||section_())+' ・ '+esc(slotLabel(currentSlot))+'<br>'+items.map(function(it){var v=values[it.no];if(v==null)return null;var j=judges[it.no];return esc(it.name)+' '+esc(v)+' <b style="color:'+(j==='NG'?'var(--danger)':j==='OK'?'var(--success)':'var(--gray-400)')+'">'+j+'</b>';}).filter(Boolean).join('<br>');
+    window.scrollTo(0,0);
+  }catch(e){alert('儲存失敗:'+e.message);}
+  btn.disabled=false;btn.textContent='送出本時段量測';
+}
+function section_(){return getSection();}
+function backToForm(){document.getElementById('success-screen').style.display='none';document.getElementById('form-screen').style.display='block';document.getElementById('input-remark').value='';loadInspection();}
+
+function renderGrid(){
+  var items=spec.items||[];var used=SLOTS.filter(function(s){return inspection.slots[s[0]];});
+  if(!used.length){document.getElementById('grid-wrap').innerHTML='';return;}
+  document.getElementById('grid-wrap').innerHTML='<div class="form-label" style="margin-top:1rem;">今日紀錄總表</div><table class="grid"><tr><th>項目</th>'+used.map(function(s){return '<th>'+s[1]+'</th>';}).join('')+'</tr>'+
+    items.map(function(it){return '<tr><td class="name">'+esc(it.name)+'</td>'+used.map(function(s){var d=inspection.slots[s[0]];var v=d.values[it.no];var j=d.judges[it.no];return '<td class="'+(j==='OK'?'ok':j==='NG'?'ng':'')+'">'+(v==null?'':esc(v))+'</td>';}).join('')+'</tr>';}).join('')+
+    '<tr><td class="name">檢驗員</td>'+used.map(function(s){return '<td>'+esc(inspection.slots[s[0]].inspector||'')+'</td>';}).join('')+'</tr></table>';
+}
+</script>
+</body>
+</html>
