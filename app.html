@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+<title>HCPI 內部系統</title>
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#5B21F4" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="HCPI" />
+<link rel="apple-touch-icon" href="/icons/icon-180.png" />
+<link rel="icon" href="/icons/icon-192.png" />
+<style>
+:root{--brand:#5B21F4;--brand-dark:#4318C4;--brand-light:#EDE9FD;--gray-50:#F9F9F9;--gray-100:#F1F1F1;--gray-200:#E2E2E2;--gray-400:#A0A0A0;--gray-600:#5A5A5A;--gray-800:#222222;--white:#fff;--radius:14px;--radius-sm:9px;--success:#2E7D3B;--success-bg:#E1F3E4;--warning:#946010;--warning-bg:#FBEED4;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif;background:var(--gray-50);color:var(--gray-800);min-height:100vh;padding-bottom:env(safe-area-inset-bottom);}
+.header{background:var(--brand);padding:calc(1.25rem + env(safe-area-inset-top)) 1.25rem 1.25rem;color:#fff;}
+.header-row{display:flex;align-items:center;gap:12px;}
+.header-logo{width:44px;height:44px;border-radius:10px;object-fit:cover;}
+.header-title{font-size:18px;font-weight:700;}
+.header-sub{font-size:12px;opacity:.75;margin-top:2px;}
+.main{max-width:520px;margin:0 auto;padding:1rem 1rem 3rem;}
+.card{background:var(--white);border-radius:var(--radius);border:1px solid var(--gray-200);padding:1.1rem 1.25rem;margin-bottom:.9rem;}
+.card-title{font-size:13px;font-weight:600;color:var(--gray-600);margin-bottom:.75rem;display:flex;align-items:center;gap:8px;}
+.card-title .right{margin-left:auto;font-weight:400;font-size:12px;color:var(--brand);cursor:pointer;}
+.who{display:flex;align-items:center;gap:12px;}
+.who-badge{background:var(--brand-light);color:var(--brand);font-weight:700;font-size:15px;padding:10px 16px;border-radius:99px;}
+.who-none{font-size:14px;color:var(--gray-400);}
+.fac-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.fac-btn{font-size:14px;padding:11px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-600);cursor:pointer;}
+.fac-btn.active{border-color:var(--brand);background:var(--brand-light);color:var(--brand);font-weight:600;}
+.mach-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.mach-btn{font-size:13px;padding:10px 4px;border-radius:8px;border:1.5px solid var(--gray-200);background:var(--white);color:var(--gray-800);cursor:pointer;text-align:center;}
+.mach-btn.active{border-color:var(--brand);background:var(--brand);color:#fff;font-weight:600;}
+.entry{display:flex;align-items:center;gap:14px;background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius);padding:1.1rem 1.25rem;margin-bottom:.75rem;cursor:pointer;text-decoration:none;color:inherit;transition:transform .1s;}
+.entry:active{transform:scale(.985);}
+.entry.disabled{opacity:.45;pointer-events:none;}
+.entry-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.entry-title{font-size:16px;font-weight:700;}
+.entry-sub{font-size:12px;color:var(--gray-400);margin-top:2px;line-height:1.4;}
+.entry-arrow{margin-left:auto;color:var(--gray-400);font-size:18px;}
+.install{background:var(--warning-bg);color:var(--warning);border-radius:var(--radius);padding:.9rem 1.1rem;font-size:13px;line-height:1.6;margin-bottom:.9rem;display:none;}
+.install b{font-weight:700;}
+.install button{margin-top:8px;width:100%;font-size:14px;font-weight:600;padding:11px;border-radius:var(--radius-sm);border:none;background:var(--brand);color:#fff;cursor:pointer;}
+.footer{text-align:center;font-size:11px;color:var(--gray-400);margin-top:1.5rem;line-height:1.7;}
+.offline{display:none;background:#333;color:#fff;font-size:12px;text-align:center;padding:6px;}
+</style>
+</head>
+<body>
+<div class="offline" id="offline">目前離線,已輸入的資料會在連線後自動送出</div>
+<div class="header">
+  <div class="header-row">
+    <img class="header-logo" src="/icons/icon-192.png" alt="" />
+    <div><div class="header-title">HCPI 內部系統</div><div class="header-sub">弘丞精密工業有限公司</div></div>
+  </div>
+</div>
+<div class="main">
+  <div class="install" id="install-android"><b>把 HCPI 裝到手機桌面</b><br>之後直接點 icon 開啟,不用再輸入網址或掃 QR。<button id="btn-install">安裝到桌面</button></div>
+  <div class="install" id="install-ios"><b>把 HCPI 裝到手機桌面</b><br>iPhone 請點下方的「分享」按鈕 <span style="font-size:15px;">⎋</span>,再選「<b>加入主畫面</b>」。</div>
+
+  <div class="card">
+    <div class="card-title">我的機台 <span class="right" id="btn-change" onclick="toggleMachinePicker(true)">更換</span></div>
+    <div class="who" id="who"></div>
+    <div id="machine-picker" style="display:none;margin-top:.9rem;">
+      <div class="fac-row"><button class="fac-btn" id="fac-一廠" onclick="pickFactory('一廠')">一廠</button><button class="fac-btn" id="fac-二廠" onclick="pickFactory('二廠')">二廠</button></div>
+      <div class="mach-grid" id="mach-grid"></div>
+    </div>
+  </div>
+
+  <a class="entry" id="entry-inspection" onclick="go('inspection')">
+    <div class="entry-icon" style="background:#EDE9FD;">📏</div>
+    <div><div class="entry-title">製程巡檢</div><div class="entry-sub">首件 / 每兩小時量測、拍規格卡 AI 辨識、自動判 OK/NG</div></div>
+    <div class="entry-arrow">›</div>
+  </a>
+  <a class="entry" id="entry-report" onclick="go('report')">
+    <div class="entry-icon" style="background:#E4F0FD;">📝</div>
+    <div><div class="entry-title">生產填報</div><div class="entry-sub">回報生產數量、班別、工段</div></div>
+    <div class="entry-arrow">›</div>
+  </a>
+  <a class="entry" href="/hcpi-order-tracker.html">
+    <div class="entry-icon" style="background:#DBF0F1;">🖥️</div>
+    <div><div class="entry-title">訂單管理系統</div><div class="entry-sub">管理者用:訂單、排程、品質、財務(需 Google 帳號登入)</div></div>
+    <div class="entry-arrow">›</div>
+  </a>
+  <div class="footer">掃描機台上的 QR Code 也可以直接進入對應頁面<br><span id="ver"></span></div>
+</div>
+
+<script>
+var MACHINES={'一廠':Array.from({length:22},function(_,i){return 'CNC車'+(i+1);}),'二廠':Array.from({length:14},function(_,i){return 'CNC銑'+(i+1);}).concat(Array.from({length:16},function(_,i){return 'CNC車'+(i+1);}))};
+var sel={factory:'',machine:''};
+try{var s=JSON.parse(localStorage.getItem('hcpi_machine')||'null');if(s&&s.factory&&s.machine)sel=s;}catch(e){}
+var pickFac=sel.factory||'一廠';
+
+function getParam(n){var m=new RegExp('[?&]'+n+'=([^&#]*)').exec(location.href);return m?decodeURIComponent(m[1]):'';}
+function render(){
+  var who=document.getElementById('who');
+  if(sel.machine){who.innerHTML='<div class="who-badge">'+sel.factory+' ・ '+sel.machine+'</div>';document.getElementById('btn-change').style.display='';}
+  else{who.innerHTML='<div class="who-none">還沒選機台,請先選一台(選一次會記住)</div>';document.getElementById('btn-change').style.display='none';toggleMachinePicker(true);}
+  ['entry-inspection','entry-report'].forEach(function(id){document.getElementById(id).classList.toggle('disabled',!sel.machine);});
+}
+function toggleMachinePicker(show){document.getElementById('machine-picker').style.display=show?'block':'none';if(show)pickFactory(pickFac);}
+function pickFactory(f){pickFac=f;['一廠','二廠'].forEach(function(x){document.getElementById('fac-'+x).className='fac-btn'+(x===f?' active':'');});
+  document.getElementById('mach-grid').innerHTML=MACHINES[f].map(function(m){return '<button class="mach-btn'+(sel.factory===f&&sel.machine===m?' active':'')+'" onclick="pickMachine(\''+f+'\',\''+m+'\')">'+m+'</button>';}).join('');}
+function pickMachine(f,m){sel={factory:f,machine:m};try{localStorage.setItem('hcpi_machine',JSON.stringify(sel));}catch(e){}toggleMachinePicker(false);render();}
+function go(which){if(!sel.machine){toggleMachinePicker(true);return;}var page=which==='inspection'?'/inspection.html':'/operator-report.html';location.href=page+'?factory='+encodeURIComponent(sel.factory)+'&machine='+encodeURIComponent(sel.machine);}
+render();
+// 捷徑 / QR 直接跳轉
+var goParam=getParam('go');if(goParam&&sel.machine)go(goParam);
+
+// ── 安裝提示 ──
+var isStandalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+var deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredPrompt=e;if(!isStandalone)document.getElementById('install-android').style.display='block';});
+document.getElementById('btn-install').onclick=function(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(function(){deferredPrompt=null;document.getElementById('install-android').style.display='none';});};
+if(isIOS&&!isStandalone)document.getElementById('install-ios').style.display='block';
+
+// ── Service worker ──
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').then(function(r){document.getElementById('ver').textContent='已啟用離線模式';}).catch(function(){});}
+function updOnline(){document.getElementById('offline').style.display=navigator.onLine?'none':'block';}
+window.addEventListener('online',updOnline);window.addEventListener('offline',updOnline);updOnline();
+</script>
+</body>
+</html>

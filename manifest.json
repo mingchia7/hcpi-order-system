@@ -1,0 +1,22 @@
+{
+  "name": "HCPI 弘丞精密工業",
+  "short_name": "HCPI",
+  "description": "弘丞精密工業內部系統:製程巡檢、生產填報、訂單管理",
+  "start_url": "/app.html?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#5B15EE",
+  "theme_color": "#5B21F4",
+  "lang": "zh-TW",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "製程巡檢", "url": "/app.html?go=inspection", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "生產填報", "url": "/app.html?go=report", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "訂單管理系統", "url": "/hcpi-order-tracker.html", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

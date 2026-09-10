@@ -4,6 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <title>HCPI 生產填報</title>
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#5B21F4" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="HCPI" />
+<link rel="apple-touch-icon" href="/icons/icon-180.png" />
+<link rel="icon" href="/icons/icon-192.png" />
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -78,6 +85,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif;back
       <div class="header-sub">弘丞精密工業有限公司</div>
     </div>
     <div class="machine-badge" id="machine-badge">-</div>
+    <a href="/app.html" style="color:#fff;text-decoration:none;font-size:20px;line-height:1;padding:4px 0 4px 8px;" title="首頁">⌂</a>
   </div>
   <div class="lang-bar">
     <button class="lang-btn active" id="lang-zh" onclick="setLang('zh')">中文</button>
@@ -223,6 +231,8 @@ var firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 var db = firebase.firestore();
+try{db.enablePersistence({synchronizeTabs:true}).catch(function(){});}catch(e){}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}
 // 匿名登入 Firebase Auth（讓 Firestore 安全規則通過）
 firebase.auth().signInAnonymously().catch(function(e){ console.error('Auth error:', e); });
 
@@ -384,6 +394,8 @@ function getParam(name) {
 
 var factory = getParam('factory');
 var machine  = getParam('machine');
+if(!factory||!machine){try{var _m=JSON.parse(localStorage.getItem('hcpi_machine')||'null');if(_m&&_m.factory&&_m.machine){factory=_m.factory;machine=_m.machine;}}catch(e){}}
+else{try{localStorage.setItem('hcpi_machine',JSON.stringify({factory:factory,machine:machine}));}catch(e){}}
 var todayISO = new Date().toISOString().split('T')[0];
 var todayDisplay = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
 

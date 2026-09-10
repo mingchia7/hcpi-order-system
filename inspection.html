@@ -4,6 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <title>HCPI 製程巡檢</title>
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#5B21F4" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="HCPI" />
+<link rel="apple-touch-icon" href="/icons/icon-180.png" />
+<link rel="icon" href="/icons/icon-192.png" />
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -99,6 +106,7 @@ table.grid td.name{text-align:left;font-weight:600;}
       <div class="header-sub">製程自主檢驗表・弘丞精密工業</div>
     </div>
     <div class="machine-badge" id="machine-badge">-</div>
+    <a href="/app.html" style="color:#fff;text-decoration:none;font-size:20px;line-height:1;padding:4px 0 4px 8px;" title="首頁">⌂</a>
   </div>
 
   <div class="main">
@@ -184,7 +192,7 @@ table.grid td.name{text-align:left;font-weight:600;}
 <div class="error-screen" id="error-screen">
   <div class="error-icon">⚠️</div>
   <div style="font-size:18px;font-weight:600;color:var(--danger);margin-bottom:.5rem;">無效的機台連結</div>
-  <div style="font-size:14px;color:var(--gray-600);">請掃描機台上的「巡檢」QR Code 進入</div>
+  <div style="font-size:14px;color:var(--gray-600);">請掃描機台上的「巡檢」QR Code 進入,或到首頁選機台</div><div style="margin-top:1.25rem;"><a href="/app.html" class="btn-outline" style="display:block;text-decoration:none;text-align:center;">回首頁選機台</a></div>
 </div>
 
 <script>
@@ -199,6 +207,8 @@ var firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 var db = firebase.firestore();
+try{db.enablePersistence({synchronizeTabs:true}).catch(function(){});}catch(e){}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}
 firebase.auth().signInAnonymously().catch(function(e){ console.error('Auth error:', e); });
 
 var RECOGNIZE_API = '/api/recognize';
@@ -208,6 +218,8 @@ var SECTION_LABEL = {CT1:'車1',CT2:'車2',CT3:'車3',CT4:'車4',CT5:'車5',CTF:
 
 function getParam(n){var m=new RegExp('[?&]'+n+'=([^&#]*)').exec(location.href);return m?decodeURIComponent(m[1].replace(/\+/g,' ')):'';}
 var factory=getParam('factory'), machine=getParam('machine');
+if(!factory||!machine){try{var _m=JSON.parse(localStorage.getItem('hcpi_machine')||'null');if(_m&&_m.factory&&_m.machine){factory=_m.factory;machine=_m.machine;}}catch(e){}}
+else{try{localStorage.setItem('hcpi_machine',JSON.stringify({factory:factory,machine:machine}));}catch(e){}}
 var todayISO=(function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
 
 var productMode='select', activeOrders=[], matchedOrders=[];
